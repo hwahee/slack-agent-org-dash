@@ -102,7 +102,7 @@
 
 ## 4. MCP — `/testbed/mcp`
 
-- **전송**: Streamable HTTP. 공식 TypeScript SDK를 기본으로 씁니다. Bun 호환성은 P1 첫 작업에서 확인합니다.
+- **전송**: Streamable HTTP. 공식 TypeScript SDK(`@modelcontextprotocol/sdk`)의 `WebStandardStreamableHTTPServerTransport`를 `Bun.serve` 라우트에 바로 붙입니다(웹 표준 `Request`/`Response`, Node `http` 흉내 없음). MCP 세션마다 전송 하나. 확인 결과는 `testbed-base`의 `docs/spec.md` 2절.
 - **세션**: `Mcp-Session-Id`가 락 보유자의 식별자입니다.
 - **initialize의 `instructions`**: "처음엔 `testbed_info` → `start_run` → 제품 작업 → `query_events`/`check` → `end_run`".
 

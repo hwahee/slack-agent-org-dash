@@ -14,6 +14,9 @@ import { buildApp } from './app';
 import { loadServerConfig } from './config';
 import { createContainer } from './container';
 import type { AppState } from './routes/health';
+import { loadTestbedConfig } from './testbed/config';
+import { CORES } from './testbed/cores';
+import { createTestbedRuntime } from './testbed/runtime';
 
 // Policy: the server process itself lives in UTC; time-zone conversion only
 // happens at the client boundary (@shared/time).
@@ -25,6 +28,25 @@ const { log } = container;
 const state: AppState = { shuttingDown: false };
 
 const stopHooks: (() => Promise<void>)[] = [];
+
+// ── Testbed ─────────────────────────────────────────────────────────────────
+// Cores open their data-plane ports here; shutdown stops them all.
+const testbed = await createTestbedRuntime({
+  config: loadTestbedConfig(process.env, config.port),
+  env: process.env,
+  log: container.log,
+  cores: CORES,
+});
+await testbed.host.startAutoStart();
+for (const core of testbed.host.statusAll()) {
+  log.info('testbed core', {
+    core: core.id,
+    state: core.state,
+    ...(core.detail === undefined ? {} : { detail: core.detail }),
+    endpoints: core.endpoints.map((endpoint) => endpoint.url),
+  });
+}
+stopHooks.push(() => testbed.host.stopAll());
 
 // ── Web role ────────────────────────────────────────────────────────────────
 if (config.serverRole === 'web' || config.serverRole === 'all') {

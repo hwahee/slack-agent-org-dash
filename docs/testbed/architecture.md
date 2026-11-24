@@ -41,7 +41,7 @@ hwahee/testbed-base ── 공통 런타임, 대시보드 셸, docs/testbed/*, �
   git merge upstream/main
   ```
 
-  머지한 뒤에는 [../upgrade-guides/](../upgrade-guides/README.md)에서 아직 적용하지 않은 가이드를 따릅니다.
+  머지한 뒤에는 [../upgrade-guides/](../upgrade-guides/README.md)에서 아직 적용하지 않은 가이드를 따릅니다. 충돌이 나면 가이드의 "충돌 해결 원칙"을 따릅니다(예: `testbed-base`가 지운 보일러플레이트 데모 파일은 삭제를 유지).
 
 - 공통 런타임 코드는 `src/server/testbed/`, `src/client/testbed/`, `src/shared/testbed/`에 모읍니다. 테스트베드별 코드는 각 폴더의 `cores/<코어 id>/`에 둡니다. 업스트림 머지 때 충돌 면적을 줄이기 위함입니다.
 - 테스트베드 레포에서는 공통 런타임(`src/*/testbed/` 중 `cores/` 밖)을 고치지 않습니다. 필요하면 `testbed-base`에 제안합니다.

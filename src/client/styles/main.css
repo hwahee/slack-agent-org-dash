@@ -329,8 +329,7 @@ a {
   font-size: var(--font-size-sm);
 }
 
-.tb-connection__list,
-.tb-core-list {
+.tb-connection__list {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -368,20 +367,6 @@ a {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   white-space: pre;
-}
-
-.tb-core-list__item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--font-size-sm);
-}
-
-.tb-core-list__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
 }
 
 .tb-counters {
@@ -432,6 +417,100 @@ a {
   align-items: flex-start;
   gap: var(--space-2);
   max-width: 32rem;
+}
+
+.tb-core-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.tb-core-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.tb-core-card__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tb-core-card__toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+}
+
+.tb-core-card__meta {
+  font-size: var(--font-size-sm);
+}
+
+.tb-core-card__body,
+.tb-core-card__section,
+.tb-editor,
+.tb-actions,
+.tb-faults {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tb-core-card__ops,
+.tb-actions__buttons,
+.tb-faults__actions,
+.tb-faults__row-actions,
+.tb-editor__choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Held lease: operating controls stay focusable but read as unavailable. */
+.btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tb-editor textarea {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.tb-editor__problems {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.tb-action__description {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.tb-code[data-ok='false'] {
+  color: var(--color-danger);
+}
+
+.tb-faults__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
 }
 
 /* /sign-in-failed: one narrow column. */

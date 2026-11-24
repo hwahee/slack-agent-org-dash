@@ -50,7 +50,7 @@ export function DashboardTabs({ tabs }: { tabs: readonly DashboardTab[] }) {
         className="tb-tabs__panel"
         data-testid={TESTID.testbed.tabs.panel}
       >
-        {Panel ? <Panel /> : <p className="muted">{t('testbed.tab.pending')}</p>}
+        {Panel && <Panel />}
       </div>
     </div>
   );

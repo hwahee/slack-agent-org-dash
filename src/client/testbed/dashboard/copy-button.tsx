@@ -9,10 +9,13 @@ export function CopyButton({
   text,
   label,
   testId,
+  compact = false,
 }: {
   text: string;
   label: string;
   testId: string;
+  /** Icon only (the label stays the accessible name). */
+  compact?: boolean;
 }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -32,7 +35,7 @@ export function CopyButton({
       }}
     >
       {copied ? <Check aria-hidden size="1em" /> : <Copy aria-hidden size="1em" />}
-      {copied ? t('testbed.copy.done') : t('testbed.copy.action')}
+      {!compact && (copied ? t('testbed.copy.done') : t('testbed.copy.action'))}
     </Button>
   );
 }

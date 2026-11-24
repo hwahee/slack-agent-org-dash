@@ -35,7 +35,7 @@ export interface DashboardTab {
   component?: ComponentType;
 }
 
-/** The common tabs, first in this order (filled in by M9). */
+/** The common tabs, first in this order; the shell draws their views. */
 export const COMMON_TABS: readonly DashboardTab[] = [
   { id: 'events', title: 'testbed.tab.events' },
   { id: 'stats', title: 'testbed.tab.stats' },

@@ -7,7 +7,7 @@
 import type { UtcIsoString } from '@shared/time';
 import { s, toValidator } from '@shared/validation';
 
-const EVENT_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
+export const EVENT_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type EventLevel = (typeof EVENT_LEVELS)[number];
 
 export type Actor = 'product' | 'human' | 'agent' | 'ci' | 'system';

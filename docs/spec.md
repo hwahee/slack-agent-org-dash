@@ -6,6 +6,7 @@
 
 | 날짜       | 바뀐 절                                                                          | 영향받는 마일스톤 |
 | ---------- | -------------------------------------------------------------------------------- | ----------------- |
+| 2026-11-24 | 2절: M1 결과(MCP SDK 1.32.2, 웹 표준 전송을 `Bun.serve`에 바로 붙임)             | M1, P2            |
 | 2026-11-24 | 11절 M0: 데모 제거 업그레이드 가이드(보일러플레이트 머지 때 충돌 해결 원칙) 추가 | M0                |
 | 2026-11-24 | 최초 작성(P0–P1)                                                                 | M0–M4             |
 
@@ -23,6 +24,13 @@
 - 보일러플레이트의 회원 로그인(OIDC) 코드와 디자인 시스템 페이지는 유지합니다. 공용 서버에서 사람 로그인에 씁니다.
 - `pubsub/`는 유지합니다(데모가 아님).
 - P1에는 MCP 어댑터, 대시보드 화면, 외부 코어를 넣지 않습니다(12절).
+- **MCP SDK (M1 결과)**: `@modelcontextprotocol/sdk` 1.32.2를 씁니다. SDK의
+  `WebStandardStreamableHTTPServerTransport`(`server/webStandardStreamableHttp.js`)가 웹 표준 `Request`를 받아
+  `Response`를 돌려주므로 `Bun.serve` 라우트 핸들러에 그대로 붙습니다. Node `http` 객체를 흉내 내지 않습니다.
+  MCP 세션마다 전송과 `McpServer`를 하나씩 만들고 `Mcp-Session-Id`로 고릅니다(`onsessioninitialized`에서 등록,
+  `onsessionclosed`에서 제거). 세션 없는 요청은 `initialize`만 받고, 끝난 세션의 요청은 404입니다. 도구 입력
+  스키마는 `@shared/validation`의 `s`(zod/mini)를 그대로 씁니다. JSON 응답(`enableJsonResponse`)과 기본 SSE 응답
+  모두 확인했습니다(`src/server/testbed/mcp/mcp-sdk.integration.test.ts`).
 
 ## 3. 구성
 

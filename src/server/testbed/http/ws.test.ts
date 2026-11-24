@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 
+import type { TestbedSocketMessage } from '@shared/testbed/control';
+
 import { sampleCore } from '../cores/sample';
 import { createTestControlPlane } from '../testing';
-import type { TestbedSocketMessage } from '@shared/testbed/control';
 
 describe('WS back-pressure', () => {
   test('above 200 events a second the stream is sampled and the batches count what was left out', async () => {
@@ -43,6 +44,50 @@ describe('WS back-pressure', () => {
     expect(
       runtime.bus.buffered().filter((event) => event.kind === 'sample.data.echoed'),
     ).toHaveLength(1200);
+    await plane.dispose();
+  });
+});
+
+describe('WS state pushes', () => {
+  test('the status after a Run ends no longer shows it open; after it starts, it does', async () => {
+    const { plane } = await createTestControlPlane({ cores: [sampleCore] });
+    const received: TestbedSocketMessage[] = [];
+    plane.hub.open({
+      send: (data: string) => received.push(JSON.parse(data) as TestbedSocketMessage),
+    });
+    const statuses = () =>
+      received.filter(
+        (message): message is Extract<TestbedSocketMessage, { type: 'status' }> =>
+          message.type === 'status',
+      );
+
+    const run = await plane.control.startRun({ label: 'ws' }, { actor: 'ci', leaseId: 'x' });
+    await Promise.resolve();
+    expect(statuses().at(-1)?.status.run?.runId).toBe(run.runId);
+
+    await plane.control.endRun({ actor: 'ci', leaseId: 'x' });
+    await Promise.resolve();
+    expect(statuses().at(-1)?.status.run).toBeNull();
+    await plane.dispose();
+  });
+
+  test('a lease message carries the lease as it is after the change', async () => {
+    const { plane } = await createTestControlPlane({ cores: [sampleCore] });
+    const received: TestbedSocketMessage[] = [];
+    plane.hub.open({
+      send: (data: string) => received.push(JSON.parse(data) as TestbedSocketMessage),
+    });
+    const leases = () =>
+      received.filter(
+        (message): message is Extract<TestbedSocketMessage, { type: 'lease' }> =>
+          message.type === 'lease',
+      );
+    const { leaseId } = plane.control.acquireLease({ actor: 'agent' });
+    await Promise.resolve();
+    expect(leases().at(-1)?.lease?.actor).toBe('agent');
+    plane.control.releaseLease({ actor: 'agent', ...(leaseId === undefined ? {} : { leaseId }) });
+    await Promise.resolve();
+    expect(leases().at(-1)?.lease).toBeNull();
     await plane.dispose();
   });
 });

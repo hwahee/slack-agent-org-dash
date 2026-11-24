@@ -74,14 +74,27 @@ export class TestbedSocketHub {
     if (over > 0 && over % SAMPLE_ONE_IN !== 0) this.omitted += 1;
     else this.queue.push(event);
 
-    // State changes go out right away, after the events that led to them.
-    if (STATUS_KINDS.has(event.kind)) {
-      this.flush();
-      this.broadcast({ type: 'status', status: this.control.status() });
-    } else if (event.kind.startsWith('testbed.lease.')) {
-      this.flush();
+    // State changes go out right away, after the events that led to them —
+    // but once the change is done: `testbed.run.ended` is emitted while the
+    // Run is still open, so the status is read at the end of this tick.
+    if (STATUS_KINDS.has(event.kind)) this.pushSoon('status');
+    else if (event.kind.startsWith('testbed.lease.')) this.pushSoon('lease');
+  }
+
+  private pending = new Set<'status' | 'lease'>();
+
+  private pushSoon(type: 'status' | 'lease'): void {
+    if (this.pending.size === 0) queueMicrotask(() => this.pushPending());
+    this.pending.add(type);
+  }
+
+  private pushPending(): void {
+    const types = this.pending;
+    this.pending = new Set();
+    this.flush();
+    if (types.has('status')) this.broadcast({ type: 'status', status: this.control.status() });
+    else if (types.has('lease'))
       this.broadcast({ type: 'lease', lease: this.control.lease.view() });
-    }
   }
 
   private flush(): void {

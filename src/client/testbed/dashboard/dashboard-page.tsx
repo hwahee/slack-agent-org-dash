@@ -9,7 +9,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { PanelLeft, PanelRight } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState, type ComponentType } from 'react';
 
 import { testbedApi } from '../../api/endpoints';
 import { AccountControls } from '../../auth/account-controls';
@@ -22,6 +22,12 @@ import { BottomSheet, Sidebar } from '../../ui/overlay/declarative';
 import { Spinner } from '../../ui/spinner';
 import { CLIENT_CORES } from '../cores';
 import { dashboardTabs } from '../registry';
+import { AgentTimeline } from '../views/agent-timeline';
+import { DetailPanel } from '../views/detail-panel';
+import { EventLog } from '../views/event-log';
+import { RunsPanel } from '../views/runs-panel';
+import { SelectionProvider } from '../views/selection';
+import { StatsPanel } from '../views/stats-panel';
 import { TestbedStoreProvider, useDismissRestart, useTestbed } from '../store/hooks';
 import { CoreColumn } from './core-column';
 import { LeaseBanner, useLeaseAttribute } from './lease-banner';
@@ -31,21 +37,13 @@ import { useMediaQuery } from './use-media-query';
 
 const WIDE = '(min-width: 1024px)';
 
-function DetailPanel() {
-  const { t } = useI18n();
-  return (
-    <section
-      className="tb-panel"
-      aria-labelledby="tb-detail-title"
-      data-testid={TESTID.testbed.detail}
-    >
-      <h2 id="tb-detail-title" className="tb-panel__title">
-        {t('testbed.detail.title')}
-      </h2>
-      <p className="muted">{t('testbed.detail.empty')}</p>
-    </section>
-  );
-}
+/** The common tabs' views (docs/testbed/dashboard.md §1). */
+const COMMON_VIEWS: Record<string, ComponentType> = {
+  events: EventLog,
+  stats: StatsPanel,
+  runs: RunsPanel,
+  agent: AgentTimeline,
+};
 
 function LoginRequired() {
   const { t } = useI18n();
@@ -66,6 +64,10 @@ function Dashboard() {
   const [coresOpen, setCoresOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   useLeaseAttribute();
+  // Goes down through context: on narrow screens, picking an event opens the detail sheet.
+  const onSelect = useCallback(() => {
+    if (!wide) setDetailOpen(true);
+  }, [wide]);
 
   const instanceId = snapshot.status?.instanceId;
   const manifest = useQuery({
@@ -76,7 +78,10 @@ function Dashboard() {
 
   if (snapshot.connection === 'unauthorized') return <LoginRequired />;
 
-  const tabs = dashboardTabs(CLIENT_CORES);
+  const tabs = dashboardTabs(CLIENT_CORES).map((tab) => {
+    const component = tab.component ?? COMMON_VIEWS[tab.id];
+    return component === undefined ? tab : { ...tab, component };
+  });
   const column = manifest.data ? (
     <CoreColumn manifest={manifest.data} status={snapshot.status} />
   ) : (
@@ -84,87 +89,89 @@ function Dashboard() {
   );
 
   return (
-    <div className="tb-dashboard" data-testid={TESTID.testbed.dashboard}>
-      <StatusBar
-        manifest={manifest.data}
-        status={snapshot.status}
-        connection={snapshot.connection}
-      />
-      <LeaseBanner />
-      {snapshot.restarted && (
-        <div data-testid={TESTID.testbed.restartNotice}>
-          <Alert
-            tone="info"
-            action={
-              <Button
-                variant="ghost"
-                onClick={dismissRestart}
-                testId={TESTID.testbed.restartDismiss}
-              >
-                {t('common.close')}
-              </Button>
-            }
-          >
-            {t('testbed.restarted')}
-          </Alert>
-        </div>
-      )}
+    <SelectionProvider onSelect={onSelect}>
+      <div className="tb-dashboard" data-testid={TESTID.testbed.dashboard}>
+        <StatusBar
+          manifest={manifest.data}
+          status={snapshot.status}
+          connection={snapshot.connection}
+        />
+        <LeaseBanner />
+        {snapshot.restarted && (
+          <div data-testid={TESTID.testbed.restartNotice}>
+            <Alert
+              tone="info"
+              action={
+                <Button
+                  variant="ghost"
+                  onClick={dismissRestart}
+                  testId={TESTID.testbed.restartDismiss}
+                >
+                  {t('common.close')}
+                </Button>
+              }
+            >
+              {t('testbed.restarted')}
+            </Alert>
+          </div>
+        )}
 
-      {!wide && (
-        <div className="tb-dashboard__toolbar">
-          <Button
-            variant="secondary"
-            onClick={() => setCoresOpen(true)}
-            testId={TESTID.testbed.openCores}
-          >
-            <PanelLeft aria-hidden size="1em" />
-            {t('testbed.cores.open')}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => setDetailOpen(true)}
-            testId={TESTID.testbed.openDetail}
-          >
-            <PanelRight aria-hidden size="1em" />
-            {t('testbed.detail.title')}
-          </Button>
-        </div>
-      )}
+        {!wide && (
+          <div className="tb-dashboard__toolbar">
+            <Button
+              variant="secondary"
+              onClick={() => setCoresOpen(true)}
+              testId={TESTID.testbed.openCores}
+            >
+              <PanelLeft aria-hidden size="1em" />
+              {t('testbed.cores.open')}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setDetailOpen(true)}
+              testId={TESTID.testbed.openDetail}
+            >
+              <PanelRight aria-hidden size="1em" />
+              {t('testbed.detail.title')}
+            </Button>
+          </div>
+        )}
 
-      <div className="tb-layout" data-wide={wide || undefined}>
-        {wide && <aside className="tb-layout__side">{column}</aside>}
-        <div className="tb-layout__main">
-          <DashboardTabs tabs={tabs} />
+        <div className="tb-layout" data-wide={wide || undefined}>
+          {wide && <aside className="tb-layout__side">{column}</aside>}
+          <div className="tb-layout__main">
+            <DashboardTabs tabs={tabs} />
+          </div>
+          {wide && (
+            <aside className="tb-layout__side">
+              <DetailPanel />
+            </aside>
+          )}
         </div>
-        {wide && (
-          <aside className="tb-layout__side">
-            <DetailPanel />
-          </aside>
+
+        {!wide && (
+          <>
+            <Sidebar
+              modality="modal"
+              open={coresOpen}
+              onClose={() => setCoresOpen(false)}
+              title={t('testbed.cores.open')}
+              testId={TESTID.testbed.coresOverlay}
+            >
+              {column}
+            </Sidebar>
+            <BottomSheet
+              open={detailOpen}
+              onClose={() => setDetailOpen(false)}
+              title={t('testbed.detail.title')}
+              testId={TESTID.testbed.detailOverlay}
+            >
+              <DetailPanel />
+            </BottomSheet>
+          </>
         )}
       </div>
-
-      {!wide && (
-        <>
-          <Sidebar
-            modality="modal"
-            open={coresOpen}
-            onClose={() => setCoresOpen(false)}
-            title={t('testbed.cores.open')}
-            testId={TESTID.testbed.coresOverlay}
-          >
-            {column}
-          </Sidebar>
-          <BottomSheet
-            open={detailOpen}
-            onClose={() => setDetailOpen(false)}
-            title={t('testbed.detail.title')}
-            testId={TESTID.testbed.detailOverlay}
-          >
-            <DetailPanel />
-          </BottomSheet>
-        </>
-      )}
-    </div>
+    </SelectionProvider>
   );
 }
 

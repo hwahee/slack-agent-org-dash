@@ -109,7 +109,45 @@ export const TESTID = {
       down: (id: string, index: number) => `testbed.faults.down.${id}.${index}`,
       remove: (id: string, index: number) => `testbed.faults.remove.${id}.${index}`,
     },
-    detail: 'testbed.detail',
+    detail: {
+      root: 'testbed.detail',
+      payload: 'testbed.detail.payload',
+      /** The other events with the same correlationId. */
+      group: 'testbed.detail.group',
+      groupItem: (eventId: string) => `testbed.detail.group-item.${eventId}`,
+      /** A value in the masking format, marked "redacted". */
+      redacted: 'testbed.detail.redacted',
+      copyPath: (path: string) => `testbed.detail.copy-path.${path}`,
+    },
+    eventLog: {
+      root: 'testbed.event-log',
+      row: (eventId: string) => `testbed.event-log.row.${eventId}`,
+      jumpLatest: 'testbed.event-log.jump-latest',
+      /** field: run | core | kind | level | actor | text */
+      filter: (field: string) => `testbed.event-log.filter.${field}`,
+      count: 'testbed.event-log.count',
+      omitted: 'testbed.event-log.omitted',
+    },
+    stats: {
+      root: 'testbed.stats',
+      sparkline: 'testbed.stats.sparkline',
+      latency: 'testbed.stats.latency',
+    },
+    runs: {
+      open: 'testbed.runs.open',
+      start: 'testbed.runs.start',
+      end: 'testbed.runs.end',
+      label: 'testbed.runs.label',
+      seed: 'testbed.runs.seed',
+      endActive: 'testbed.runs.end-active',
+      item: (runId: string) => `testbed.runs.item.${runId}`,
+      summary: 'testbed.runs.summary',
+      export: 'testbed.runs.export',
+    },
+    agentTimeline: {
+      root: 'testbed.agent-timeline',
+      item: (eventId: string) => `testbed.agent-timeline.item.${eventId}`,
+    },
     /** Under 1024 px: the buttons that open the side columns as overlays. */
     openCores: 'testbed.open-cores',
     openDetail: 'testbed.open-detail',

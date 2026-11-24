@@ -8,7 +8,7 @@
  * events.
  */
 import { appendFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import type { TestbedEvent } from '@shared/testbed/events';
 import type { RunMeta } from '@shared/testbed/runs';
@@ -127,6 +127,9 @@ export async function openFileRunStore(options: FileRunStoreOptions): Promise<Ru
       if (!metas.has(runId)) return [];
       await flush();
       return readJsonl(eventsPath(runId));
+    },
+    location(runId) {
+      return metas.has(runId) ? resolve(eventsPath(runId)) : undefined;
     },
   };
 }

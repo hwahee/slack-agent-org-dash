@@ -8,40 +8,13 @@
  */
 import { TESTBED_ERROR_STATUS } from '@shared/testbed/errors';
 import { eventFilterValidator, type Caller, type EventFilter } from '@shared/testbed/events';
-import { s, toValidator } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
 import { apiRoute, json, type ApiHandler, type HttpDeps } from '../../http/respond';
 import { TestbedError } from '../errors';
+import { checkInput, configPatchInput, startRunInput, waitInput } from '../control/inputs';
 import type { ControlService } from '../control/service';
 import { resolveCaller, type ControlAuth } from './auth';
-
-const startRunValidator = toValidator(
-  s.object({
-    label: s.string().check(s.minLength(1), s.maxLength(200)),
-    seed: s.optional(s.string().check(s.minLength(1), s.maxLength(200))),
-    configOverrides: s.optional(s.record(s.string(), s.record(s.string(), s.unknown()))),
-    endActive: s.optional(s.boolean()),
-  }),
-);
-
-const configPatchValidator = toValidator(s.record(s.string(), s.unknown()));
-
-const waitValidator = toValidator(
-  s.object({
-    filter: s._default(s.unknown(), {}),
-    count: s.optional(s.int().check(s.gte(1), s.lte(500))),
-    timeoutMs: s.optional(s.int().check(s.gte(0))),
-  }),
-);
-
-const checkValidator = toValidator(
-  s.object({
-    filter: s._default(s.unknown(), {}),
-    expect: s._default(s.record(s.string(), s.unknown()), {}),
-    label: s.optional(s.string().check(s.minLength(1), s.maxLength(200))),
-  }),
-);
 
 const OPERATIONS = ['start', 'stop', 'reset'] as const;
 
@@ -57,6 +30,24 @@ function filterFromQuery(url: URL): EventFilter {
   if (typeof raw.limit === 'string') raw.limit = Number(raw.limit);
   delete raw.lang;
   return eventFilterValidator.parse(raw);
+}
+
+/**
+ * Lets a route's requests outlive `Bun.serve`'s idle timeout (10 s by
+ * default) — for `/wait`, which may say nothing for up to 120 s.
+ */
+function untimed<P extends string>(
+  entry: Record<string, (req: Bun.BunRequest<P>) => Promise<Response>>,
+): Record<string, (req: Bun.BunRequest<P>, server: Bun.Server<unknown>) => Promise<Response>> {
+  return Object.fromEntries(
+    Object.entries(entry).map(([method, handler]) => [
+      method,
+      (req: Bun.BunRequest<P>, server: Bun.Server<unknown>) => {
+        server.timeout(req, 0);
+        return handler(req);
+      },
+    ]),
+  );
 }
 
 type Handler<P extends string> = (req: Bun.BunRequest<P>, caller: Caller) => Promise<Response>;
@@ -106,11 +97,7 @@ export function testbedRestRoutes(control: ControlService, deps: HttpDeps, auth:
       GET: (req, caller) => Promise.resolve(json(control.getConfig(req.params.core, caller))),
       PATCH: async (req, caller) =>
         json(
-          await control.setConfig(
-            req.params.core,
-            configPatchValidator.parse(await body(req)),
-            caller,
-          ),
+          await control.setConfig(req.params.core, configPatchInput.parse(await body(req)), caller),
         ),
     }),
     '/testbed/api/cores/:core/:op': route<'/testbed/api/cores/:core/:op'>({
@@ -127,7 +114,7 @@ export function testbedRestRoutes(control: ControlService, deps: HttpDeps, auth:
     '/testbed/api/runs': route({
       GET: async (_req, caller) => json({ runs: await control.listRuns(caller) }),
       POST: async (req, caller) => {
-        const input = startRunValidator.parse(await body(req));
+        const input = startRunInput.parse(await body(req));
         return json(
           await control.startRun(
             {
@@ -170,28 +157,30 @@ export function testbedRestRoutes(control: ControlService, deps: HttpDeps, auth:
     '/testbed/api/events/:id': route<'/testbed/api/events/:id'>({
       GET: (req, caller) => Promise.resolve(json(control.getEvent(req.params.id, caller))),
     }),
-    '/testbed/api/wait': route({
-      POST: async (req, caller) => {
-        const input = waitValidator.parse(await body(req));
-        return json(
-          await control.waitFor(
-            {
-              filter: eventFilterValidator.parse(input.filter),
-              ...(input.count === undefined ? {} : { count: input.count }),
-              ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
-            },
-            caller,
-          ),
-        );
-      },
-    }),
+    '/testbed/api/wait': untimed(
+      route({
+        POST: async (req, caller) => {
+          const input = waitInput.parse(await body(req));
+          return json(
+            await control.waitFor(
+              {
+                filter: input.filter,
+                ...(input.count === undefined ? {} : { count: input.count }),
+                ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+              },
+              caller,
+            ),
+          );
+        },
+      }),
+    ),
     '/testbed/api/check': route({
       POST: async (req, caller) => {
-        const input = checkValidator.parse(await body(req));
+        const input = checkInput.parse(await body(req));
         return json(
           await control.check(
             {
-              filter: eventFilterValidator.parse(input.filter),
+              filter: input.filter,
               expect: input.expect,
               ...(input.label === undefined ? {} : { label: input.label }),
             },

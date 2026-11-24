@@ -113,19 +113,21 @@ hwahee/testbed-base ── 공통 런타임, 대시보드 셸, docs/testbed/*, �
 
 env는 **부팅 기본값**만 정합니다. 실행 중 변경은 제어 API로 하고, 재시작하면 사라지지만 Run 메타에 스냅샷으로 남습니다.
 
-| 변수                        | 기본                                   | 설명                                           |
-| --------------------------- | -------------------------------------- | ---------------------------------------------- |
-| `PORT`                      | 포트 블록의 +0 ([ports.md](ports.md))  | 대시보드 + 제어면 HTTP                         |
-| `TESTBED_BIND_HOST`         | 로컬 dev `127.0.0.1`, 이미지 `0.0.0.0` | 데이터면·제어면 바인딩                         |
-| `TESTBED_PUBLIC_URL`        | `http://localhost:${PORT}`             | 매니페스트와 `.mcp.json` 조각에 쓰는 외부 주소 |
-| `TESTBED_EVENT_BUFFER`      | `5000`                                 | 링버퍼 크기(건)                                |
-| `TESTBED_RUN_STORE`         | `memory`                               | `memory` 또는 `file`                           |
-| `TESTBED_DATA_DIR`          | `./data`                               | file 저장소 위치 (gitignore)                   |
-| `TESTBED_RUN_RETENTION`     | `50`                                   | 보존할 Run 수                                  |
-| `TESTBED_CONTROL_TOKEN`     | (비움)                                 | 설정하면 에이전트·CI 제어면에 Bearer 필요      |
-| `TESTBED_LEASE_TTL_SEC`     | `600`                                  | 제어 락 TTL(초)                                |
-| `TESTBED_MAX_PAYLOAD_BYTES` | `16384`                                | 이벤트 payload 상한(bytes)                     |
-| `<CORE_ID>_*`               | –                                      | 코어별. 예: `ECHO_PORT`, `LLM_DEFAULT_MODEL`   |
+| 변수                           | 기본                                   | 설명                                                              |
+| ------------------------------ | -------------------------------------- | ----------------------------------------------------------------- |
+| `PORT`                         | 포트 블록의 +0 ([ports.md](ports.md))  | 대시보드 + 제어면 HTTP                                            |
+| `TESTBED_BIND_HOST`            | 로컬 dev `127.0.0.1`, 이미지 `0.0.0.0` | 데이터면·제어면 바인딩                                            |
+| `TESTBED_PUBLIC_URL`           | `http://localhost:${PORT}`             | 매니페스트와 `.mcp.json` 조각에 쓰는 외부 주소                    |
+| `TESTBED_EVENT_BUFFER`         | `5000`                                 | 링버퍼 크기(건)                                                   |
+| `TESTBED_RUN_STORE`            | `memory`                               | `memory` 또는 `file`                                              |
+| `TESTBED_DATA_DIR`             | `./data`                               | file 저장소 위치 (gitignore)                                      |
+| `TESTBED_RUN_RETENTION`        | `50`                                   | 보존할 Run 수                                                     |
+| `TESTBED_CONTROL_TOKEN`        | (비움)                                 | 설정하면 에이전트·CI 제어면에 Bearer 필요                         |
+| `TESTBED_LEASE_TTL_SEC`        | `600`                                  | 제어 락 TTL(초)                                                   |
+| `TESTBED_MAX_PAYLOAD_BYTES`    | `16384`                                | 이벤트 payload 상한(bytes)                                        |
+| `TESTBED_MCP_MAX_SESSIONS`     | `32`                                   | 동시에 열 수 있는 MCP 세션 수. 넘으면 새 `initialize`가 503       |
+| `TESTBED_MCP_SESSION_IDLE_SEC` | `3600`                                 | 이 시간(초) 동안 요청이 없는 MCP 세션은 서버가 닫음(쥔 락도 풀림) |
+| `<CORE_ID>_*`                  | –                                      | 코어별. 예: `ECHO_PORT`, `LLM_DEFAULT_MODEL`                      |
 
 - 제품이 다른 머신에 있으면 `TESTBED_BIND_HOST=0.0.0.0`과 `TESTBED_PUBLIC_URL`을 함께 바꿉니다.
 

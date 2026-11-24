@@ -21,6 +21,8 @@ export interface RunStore {
   list(): Promise<RunMeta[]>;
   /** The Run's events in order (empty for an unknown Run). */
   events(runId: string): Promise<TestbedEvent[]>;
+  /** Where the Run's JSONL lives on disk (`file` driver), or `undefined`. */
+  location(runId: string): string | undefined;
 }
 
 /** The ids of closed Runs to delete so only `retention` remain. */

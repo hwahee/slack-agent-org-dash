@@ -16,6 +16,10 @@ const testbedConfigValidator = toValidator(
     /** Set → agents and CI need `Authorization: Bearer <token>`. */
     controlToken: s.optional(s.string().check(s.minLength(1))),
     leaseTtlSec: s.int().check(s.gte(1)),
+    /** Open MCP sessions at most; a new `initialize` beyond it gets 503. */
+    mcpMaxSessions: s.int().check(s.gte(1)),
+    /** An MCP session with no requests for this long is closed by the server. */
+    mcpSessionIdleSec: s.int().check(s.gte(1)),
   }),
 );
 
@@ -44,5 +48,7 @@ export function loadTestbedConfig(
     maxPayloadBytes: intOr(env.TESTBED_MAX_PAYLOAD_BYTES, 16_384),
     controlToken: env.TESTBED_CONTROL_TOKEN === '' ? undefined : env.TESTBED_CONTROL_TOKEN,
     leaseTtlSec: intOr(env.TESTBED_LEASE_TTL_SEC, 600),
+    mcpMaxSessions: intOr(env.TESTBED_MCP_MAX_SESSIONS, 32),
+    mcpSessionIdleSec: intOr(env.TESTBED_MCP_SESSION_IDLE_SEC, 3600),
   });
 }

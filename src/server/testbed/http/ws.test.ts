@@ -43,6 +43,6 @@ describe('WS back-pressure', () => {
     expect(
       runtime.bus.buffered().filter((event) => event.kind === 'sample.data.echoed'),
     ).toHaveLength(1200);
-    plane.dispose();
+    await plane.dispose();
   });
 });

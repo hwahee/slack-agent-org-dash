@@ -1,9 +1,10 @@
 /**
- * Everything the testbed mounts on the HTTP server: REST, the WS upgrade and
+ * Everything the testbed mounts on the HTTP server: REST, MCP, the WS upgrade and
  * the local-only emergency lease release used by `bun run testbed:release`.
  */
 import { json, type HttpDeps } from '../../http/respond';
 import type { ControlService } from '../control/service';
+import type { McpEndpoint } from '../mcp/endpoint';
 import { humanCaller, type ControlAuth } from './auth';
 import { testbedRestRoutes } from './rest';
 import type { TestbedSocketHub } from './ws';
@@ -13,6 +14,7 @@ const RELEASE_PATH = '/testbed/internal/release';
 export interface TestbedHttp {
   control: ControlService;
   hub: TestbedSocketHub;
+  mcp: McpEndpoint;
   auth: ControlAuth;
 }
 
@@ -33,6 +35,9 @@ function isLoopback(address: string | undefined): boolean {
 export function testbedRoutes(testbed: TestbedHttp, deps: HttpDeps) {
   return {
     ...testbedRestRoutes(testbed.control, deps, testbed.auth),
+    /** MCP Streamable HTTP (agents); auth and sessions inside. */
+    '/testbed/mcp': (req: Request, server: Bun.Server<TestbedSocketData>) =>
+      testbed.mcp.handle(req, server),
     /** Dashboard stream (signed-in people only when sign-in is on). */
     '/testbed/ws': (req: Request, server: Bun.Server<TestbedSocketData>) => {
       try {

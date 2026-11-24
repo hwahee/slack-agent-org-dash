@@ -15,6 +15,7 @@ import { CoreHost } from './core-host';
 import { EventBus } from './events/bus';
 import type { TestbedHttp } from './http/routes';
 import { TestbedSocketHub } from './http/ws';
+import { McpEndpoint } from './mcp/endpoint';
 import { openFileRunStore } from './runs/file-store';
 import { createMemoryRunStore } from './runs/memory-store';
 import { RunManager } from './runs/runs';
@@ -57,13 +58,14 @@ export async function createTestbedRuntime(options: {
 }
 
 /**
- * The control plane over a runtime: lease, control service and the WS hub,
+ * The control plane over a runtime: lease, control service, the WS hub and
+ * the MCP endpoint,
  * ready for `buildApp`. Call `dispose` on shutdown.
  */
 export function createControlPlane(
   rt: TestbedRuntime,
   options: { config: TestbedConfig; server: Pick<ServerConfig, 'authDriver' | 'oidc'> },
-): TestbedHttp & { dispose(): void } {
+): TestbedHttp & { dispose(): Promise<void> } {
   const { config, server } = options;
   const lease = new LeaseManager(rt.bus, { ttlSec: config.leaseTtlSec });
   const control = new ControlService(rt, lease, {
@@ -72,16 +74,28 @@ export function createControlPlane(
     baseVersion: TESTBED_BASE_VERSION,
     authControl: config.controlToken === undefined ? 'none' : 'bearer',
     runStore: config.runStore,
+    publicUrl: config.publicUrl,
   });
   const hub = new TestbedSocketHub(control, rt.bus);
+  const auth = {
+    server,
+    ...(config.controlToken === undefined ? {} : { controlToken: config.controlToken }),
+  };
+  const mcp = new McpEndpoint({
+    control,
+    auth,
+    name: packageJson.name,
+    version: APP_VERSION,
+    maxSessions: config.mcpMaxSessions,
+    sessionIdleSec: config.mcpSessionIdleSec,
+  });
   return {
     control,
     hub,
-    auth: {
-      server,
-      ...(config.controlToken === undefined ? {} : { controlToken: config.controlToken }),
-    },
-    dispose() {
+    mcp,
+    auth,
+    async dispose() {
+      await mcp.dispose();
       hub.dispose();
       lease.dispose();
     },

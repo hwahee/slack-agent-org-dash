@@ -15,6 +15,8 @@ describe('loadTestbedConfig', () => {
       runRetention: 50,
       maxPayloadBytes: 16_384,
       leaseTtlSec: 600,
+      mcpMaxSessions: 32,
+      mcpSessionIdleSec: 3600,
     });
   });
 

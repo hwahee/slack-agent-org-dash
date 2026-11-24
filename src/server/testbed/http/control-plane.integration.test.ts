@@ -6,12 +6,8 @@ import { afterEach, describe, expect, test } from 'bun:test';
 
 import type { TestbedEvent } from '@shared/testbed/events';
 
-import { buildApp } from '../../app';
-import { loadServerConfig } from '../../config';
-import { createContainer } from '../../container';
-import { silentLogger } from '../../lib/log';
 import { sampleCore } from '../cores/sample';
-import { createTestControlPlane, TcpClient, waitForEvent } from '../testing';
+import { startTestServer, TcpClient, waitForEvent } from '../testing';
 import type { TestbedSocketMessage } from './ws';
 
 const stops: (() => Promise<void>)[] = [];
@@ -28,21 +24,13 @@ function freePort(): number {
   return port;
 }
 
-async function startTestbed(env: Record<string, string> = {}) {
-  const { runtime, plane } = await createTestControlPlane({ cores: [sampleCore], env });
-  await runtime.host.startAutoStart();
-  const container = createContainer(loadServerConfig({}), { log: silentLogger });
-  const server = Bun.serve({
-    port: 0,
-    ...buildApp(container, { shuttingDown: false }, plane),
+async function startTestbed(env: Record<string, string> = {}, idleTimeout?: number) {
+  const { base, server, runtime, plane, stop } = await startTestServer({
+    cores: [sampleCore],
+    env,
+    ...(idleTimeout === undefined ? {} : { idleTimeout }),
   });
-  stops.push(async () => {
-    plane.dispose();
-    await runtime.host.stopAll();
-    await server.stop(true);
-    await container.dispose();
-  });
-  const base = String(server.url).replace(/\/$/, '');
+  stops.push(stop);
 
   async function call<T = Record<string, unknown>>(
     method: string,
@@ -353,6 +341,16 @@ describe('events, wait and check', () => {
     });
     expect(idle.body).toEqual({ events: [], timedOut: true });
   });
+
+  test('POST /wait may outlast the HTTP idle timeout', async () => {
+    // Bun checks idle sockets every ~4 s, so a 1 s idle timeout bites within 5 s.
+    const { call } = await startTestbed({}, 1);
+    const idle = await call<{ events: TestbedEvent[]; timedOut: boolean }>('POST', '/wait', {
+      body: { filter: { kind: 'sample.never.happens' }, timeoutMs: 6000 },
+    });
+    expect(idle.status).toBe(200);
+    expect(idle.body).toEqual({ events: [], timedOut: true });
+  }, 10_000);
 
   test('POST /check judges and records', async () => {
     const { call, events } = await startTestbed();

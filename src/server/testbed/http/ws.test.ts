@@ -91,3 +91,37 @@ describe('WS state pushes', () => {
     await plane.dispose();
   });
 });
+
+describe('WS counters', () => {
+  test('data-plane events bring a status with fresh counters, at most once a second', async () => {
+    const { runtime, plane } = await createTestControlPlane({ cores: [sampleCore] });
+    await runtime.host.startAutoStart();
+    const received: TestbedSocketMessage[] = [];
+    plane.hub.open({
+      send: (data: string) => received.push(JSON.parse(data) as TestbedSocketMessage),
+    });
+    const statuses = () => received.filter((message) => message.type === 'status');
+    const before = statuses().length;
+    for (let i = 0; i < 50; i += 1) {
+      runtime.bus.emit({
+        core: 'sample',
+        kind: 'sample.data.echoed',
+        actor: 'product',
+        summary: `#${i}`,
+      });
+    }
+    await new Promise<void>((resolve) => {
+      const timer = setInterval(() => {
+        if (statuses().length > before) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 10);
+    });
+    // One status for the burst, not one per event.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(statuses().length - before).toBe(1);
+    await runtime.host.stopAll();
+    await plane.dispose();
+  });
+});

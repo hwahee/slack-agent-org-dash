@@ -181,7 +181,7 @@
 - 메시지(`TestbedSocketMessage`, `src/shared/testbed/control.ts`)
   - `{ type: 'snapshot', status, events }` — 연결 직후 한 번. `events`는 링버퍼의 최근 200건
   - `{ type: 'event', events, omitted }` — 100ms마다 묶어 보냄
-  - `{ type: 'status', status }` — 코어 상태 변화, Run 시작·종료 때
+  - `{ type: 'status', status }` — 코어 상태 변화, Run 시작·종료 때. 코어 이벤트(데이터면 트래픽)가 있으면 카운터가 바뀌므로 최대 1초에 한 번 더 보냅니다
   - `{ type: 'lease', lease }` — 락 획득·해제·만료 때
   - `status`와 `lease`는 그 변화를 알린 이벤트가 나간 뒤, 같은 틱이 끝날 때 상태를 읽어 보냅니다. `testbed.run.ended`는 Run이 아직 열린 채로 발행되므로, 바로 읽으면 닫힌 Run이 열린 것으로 보이기 때문입니다. 한 틱에 둘 다 있으면 `status`(락 포함) 하나만 보냅니다.
 - 표본화: 1초 안에 200건을 넘으면 그 뒤로는 10건 중 1건만 보내고, 나머지 건수를 `omitted`에 담습니다. 링버퍼와 Run 저장소에는 모두 남습니다.

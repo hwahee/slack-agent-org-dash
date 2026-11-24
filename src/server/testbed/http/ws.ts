@@ -3,7 +3,8 @@
  *
  * On connect: `snapshot` (status + the latest events). Then increments:
  * `event` (batched every 100 ms), `status` (a core changed state, a Run
- * opened or closed) and `lease`. Nothing is operated over WS.
+ * opened or closed, and at most once a second while core events move the
+ * counters) and `lease`. Nothing is operated over WS.
  *
  * Back-pressure (docs/testbed/events.md §1): above 200 events in a second the
  * stream is sampled — one in ten goes out — and each `event` batch says how
@@ -25,6 +26,8 @@ const SAMPLE_ABOVE_PER_SECOND = 200;
 const SAMPLE_ONE_IN = 10;
 
 const STATUS_KINDS = new Set(['testbed.core.state', 'testbed.run.started', 'testbed.run.ended']);
+/** Counters change with data-plane traffic; their status goes out at most this often. */
+const COUNTERS_EVERY_MS = 1000;
 
 export class TestbedSocketHub {
   private readonly sockets = new Set<Socket>();
@@ -40,7 +43,7 @@ export class TestbedSocketHub {
     private readonly bus: EventBus,
   ) {
     this.unsubscribe = bus.subscribe((event) => this.onEvent(event));
-    this.timer = setInterval(() => this.flush(), FLUSH_MS);
+    this.timer = setInterval(() => this.tick(), FLUSH_MS);
     this.timer.unref();
   }
 
@@ -63,7 +66,19 @@ export class TestbedSocketHub {
     this.unsubscribe();
   }
 
+  /** Core events moved the counters since the last status. */
+  private countersMoved = false;
+  private lastStatusAt = 0;
+
+  private tick(): void {
+    this.flush();
+    if (this.countersMoved && Date.now() - this.lastStatusAt >= COUNTERS_EVERY_MS) {
+      this.broadcast({ type: 'status', status: this.control.status() });
+    }
+  }
+
   private onEvent(event: TestbedEvent): void {
+    if (event.core !== 'testbed') this.countersMoved = true;
     const now = Date.now();
     if (now - this.windowStart >= 1000) {
       this.windowStart = now;
@@ -110,6 +125,10 @@ export class TestbedSocketHub {
   }
 
   private broadcast(message: TestbedSocketMessage): void {
+    if (message.type === 'status') {
+      this.countersMoved = false;
+      this.lastStatusAt = Date.now();
+    }
     if (this.sockets.size === 0) return;
     const data = JSON.stringify(message);
     for (const socket of this.sockets) socket.send(data);

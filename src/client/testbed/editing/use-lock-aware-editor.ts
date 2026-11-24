@@ -53,13 +53,18 @@ export function useLockAwareEditor<D, V>(options: {
     serverRef.current = server;
   }, [refetch, server]);
 
+  // Unlock only when the lease is seen going away: a save refused with 423
+  // can lock the editor before the page has heard about the lease at all.
+  const wasLocked = useRef(locked);
   const phase = state.phase;
   useEffect(() => {
+    const released = wasLocked.current && !locked;
+    wasLocked.current = locked;
     if (locked) {
       dispatch({ type: 'lock' });
       return;
     }
-    if (phase !== 'locked') return;
+    if (phase !== 'locked' || !released) return;
     // Released: compare with a fresh server value. If it cannot be read (twice),
     // compare with the last one known rather than stay locked.
     let cancelled = false;

@@ -9,7 +9,7 @@
 | 정적·단위  | `bun run check` (prettier → eslint → tsc → knip → test. CI와 같음)                                                        |
 | 통합       | `bun test` — 코어를 in-memory 인스턴스로 띄워 실제 소켓으로 데이터면을 시험                                               |
 | MCP 스모크 | `bun run testbed:smoke` — 인스턴스를 띄우고 MCP 클라이언트로 공통 점검, 스펙 수용 기준 시나리오, 액션 커버리지를 실행(§4) |
-| UI 자동화  | Playwright + `TESTID` — 핵심 흐름과 락 상태(조작 비활성)                                                                  |
+| UI 자동화  | `bun run test:ui` — Playwright + `TESTID`. 핵심 흐름과 락 상태(조작 비활성)(§5)                                           |
 | 자기 사용  | 구현한 에이전트가 자기 `.mcp.json`에 테스트베드를 붙여 수용 기준을 직접 호출해 봄(권장)                                   |
 
 ## 2. 마일스톤별 완료 판정
@@ -18,7 +18,7 @@
 | --- | ------------------------------------------------------------------------------- |
 | M1  | 코어 단위·통합 테스트 통과, `bun run check` 통과                                |
 | M2  | `bun run testbed:smoke` 통과(커버리지 포함)                                     |
-| M3  | testid 기반 UI 자동화(핵심 흐름과 락 상태) 통과                                 |
+| M3  | `bun run test:ui` 통과(핵심 흐름과 락 상태)                                     |
 | M4  | 이미지를 띄운 뒤 `bun run testbed:smoke --url` 통과, `docs/agent-usage.md` 존재 |
 
 ## 3. 통합 테스트 규칙
@@ -107,3 +107,15 @@ total: 3 pass, 1 fail, 1 skip; coverage PASS
 
 - `ci.yml`의 `ci` job: 테스트 단계 뒤에 `bun run testbed:smoke`.
 - 이미지 job(`main` push만): 이미지를 빌드하고(`load`), 컨테이너를 띄워(`-p 40000-40009:40000-40009`) `bun run testbed:smoke --url http://localhost:40000`이 통과해야 GHCR에 push합니다. 테스트베드 레포는 `IMAGE`와 포트 블록만 바꿉니다.
+
+## 5. UI 자동화 — `bun run test:ui`
+
+- 위치: 시험은 `e2e/*.e2e.ts`(파일 이름이 `.e2e.ts`라 `bun test` 대상이 아님), 설정은 `playwright.config.ts`, 실행 스크립트는 `scripts/test-ui.ts`. `@playwright/test`는 개발 의존성이고 Chromium만 씁니다.
+- 실행: `bun run test:ui`가 MCP 스모크와 같은 모듈(`src/server/testbed/smoke/server.ts`)로 서버를 빈 포트에 띄우고(`TESTBED_RUN_STORE=memory`, 코어 포트 `0`), 주소를 `TESTBED_UI_URL`로 넘겨 `playwright test`를 돌린 뒤 종료합니다. 뒤에 붙인 인자는 Playwright로 넘어갑니다(예: `bun run test:ui -g "lease"`). 서버를 띄우지 못하면 종료 코드 2입니다.
+- 시험들은 인스턴스 하나를 같이 쓰므로 하나씩(`workers: 1`) 돌고, 시험마다 처음에 상태를 되돌립니다(`e2e/helpers.ts`의 `resetTestbed`: 로컬 전용 경로로 락 강제 해제, 열린 Run 닫기, 결함 규칙 비우기, 코어 시작).
+- 제품과 에이전트 흉내는 브라우저 밖에서 합니다. 데이터면은 TCP(`tcp()`), 락과 설정은 REST(`api()`, `takeLease()`, actor `agent`)입니다.
+- 선택자는 ARIA 우선(`getByRole`, `getByLabel`), 그다음 `TESTID`([../ui-automation.md](../ui-automation.md))입니다. 화면 언어는 `en-US`로 고정합니다.
+- 페이지가 아직 모르는 변화를 만들어야 할 때(예: 저장 직전에 락이 걸림)는 `gateLiveUpdates(page)`로 `/testbed/ws` 메시지를 잠시 붙잡아 둡니다(`page.routeWebSocket`).
+- CI(`ci.yml`의 `ci` job): 스모크 뒤에 `bunx playwright install --with-deps chromium`과 `bun run test:ui`. 실패하면 `playwright-report/`와 `test-results/`(실패 화면 캡처)를 아티팩트로 올립니다.
+
+testbed-base의 시험(`e2e/dashboard.e2e.ts`)은 `docs/spec.md` §11 M10의 수용 기준 1–8입니다. 테스트베드 레포는 고유 화면의 시험을 `e2e/` 아래에 더합니다.

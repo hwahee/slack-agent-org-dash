@@ -11,6 +11,9 @@ dist/
 
 # Test / coverage
 coverage/
+# Playwright (bun run test:ui)
+playwright-report/
+test-results/
 
 # Editor & OS
 .DS_Store

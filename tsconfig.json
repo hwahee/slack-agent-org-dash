@@ -26,5 +26,5 @@
       "@client/*": ["./src/client/*"]
     }
   },
-  "include": ["src", "scripts", "eslint.config.js"]
+  "include": ["src", "scripts", "e2e", "playwright.config.ts", "eslint.config.js"]
 }

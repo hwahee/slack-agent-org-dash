@@ -135,6 +135,8 @@ test('picks a preset color', async ({ page }) => {
 
 ## Playwright 예시
 
+테스트베드의 UI 시험은 `e2e/*.e2e.ts`에 있고 `bun run test:ui`로 돌립니다([testbed/verification.md](testbed/verification.md) §5).
+
 ```ts
 import { TESTID } from '../src/client/testing/testids';
 

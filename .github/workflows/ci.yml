@@ -39,11 +39,17 @@ jobs:
       - name: Tests (unit + API integration, in-memory DB)
         run: bun test
 
+      # Boots this repo's server on a free port and runs the MCP smoke
+      # (docs/testbed/verification.md §4).
+      - name: MCP smoke
+        run: bun run testbed:smoke
+
       - name: Production build
         run: bun run build
 
-  # Builds the Docker image and pushes it to GHCR — only for pushes to main,
-  # and only after the `ci` job above passed (docs/testbed/architecture.md §8).
+  # Builds the Docker image, runs the MCP smoke against a container of it and
+  # pushes it to GHCR — only for pushes to main, and only after the `ci` job
+  # above passed (docs/testbed/architecture.md §8).
   # A testbed repository changes only IMAGE.
   image:
     needs: ci
@@ -57,6 +63,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # The smoke runs from this checkout (its scenarios live in the repo).
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -65,11 +79,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
+          load: true
           tags: |
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:latest
+
+      # The image must pass the smoke before it is pushed. The whole port
+      # block is published: the scenarios reach the data plane (40001) too.
+      - name: MCP smoke against the image
+        run: |
+          docker run -d --name testbed -p 40000-40009:40000-40009 "$IMAGE:$GITHUB_SHA"
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:40000/api/health/ready >/dev/null && break
+            sleep 1
+          done
+          bun run testbed:smoke --url http://localhost:40000 || { docker logs testbed; exit 1; }
+
+      - name: Push
+        run: docker push --all-tags "$IMAGE"

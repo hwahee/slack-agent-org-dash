@@ -1,16 +1,15 @@
 /**
- * API integration tests: the real app (routes, middleware, container,
- * services) booted on an ephemeral port with the in-memory persistence
+ * API integration tests: the real app (routes, middleware, container)
+ * booted on an ephemeral port with the in-memory persistence
  * driver — one command, zero external services.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 
 import { VERSION_HEADER } from '@shared/api/version';
 import type { Sitemap } from '@shared/domain/sitemap';
-import type { Todo } from '@shared/domain/todo';
 import type { User } from '@shared/domain/user';
 
-import { buildApp, type SocketData } from '../app';
+import { buildApp } from '../app';
 import { memberCookie as signedInCookie, startFakeIssuer } from '../auth/fake-issuer';
 import { loadServerConfig, type ServerConfig } from '../config';
 import { createContainer, type Container } from '../container';
@@ -24,9 +23,9 @@ const issuer = startFakeIssuer();
 let config: ServerConfig;
 let container: Container;
 let state: AppState;
-let server: Bun.Server<SocketData>;
+let server: Bun.Server<undefined>;
 let baseUrl: string;
-/** Session cookie of a signed-in member — writing todos needs one. */
+/** Session cookie of a signed-in member — `/api/auth/me` answers 200 with it. */
 let memberCookie: string;
 
 beforeAll(() => {
@@ -49,13 +48,7 @@ afterAll(async () => {
   await issuer.stop();
 });
 
-beforeEach(async () => {
-  // Isolate tests: wipe every todo through the public API.
-  let page = await api<{ items: Todo[] }>('GET', '/api/todos?pageSize=100');
-  while (page.body.items.length > 0) {
-    for (const todo of page.body.items) await api('DELETE', `/api/todos/${todo.id}`);
-    page = await api<{ items: Todo[] }>('GET', '/api/todos?pageSize=100');
-  }
+beforeEach(() => {
   state.shuttingDown = false;
 });
 
@@ -112,123 +105,28 @@ describe('health endpoints', () => {
   });
 });
 
-describe('todos CRUD', () => {
-  test('full lifecycle: create → read → update → delete', async () => {
-    const created = await api<Todo>('POST', '/api/todos', { body: { title: 'Integration' } });
-    expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({ title: 'Integration', status: 'open' });
-    expect(created.body.createdAt).toMatch(/Z$/); // UTC at the boundary
-
-    const fetched = await api<Todo>('GET', `/api/todos/${created.body.id}`);
-    expect(fetched.status).toBe(200);
-    expect(fetched.body.id).toBe(created.body.id);
-
-    const updated = await api<Todo>('PATCH', `/api/todos/${created.body.id}`, {
-      body: { status: 'done' },
-    });
-    expect(updated.status).toBe(200);
-    expect(updated.body.status).toBe('done');
-
-    const deleted = await api('DELETE', `/api/todos/${created.body.id}`);
-    expect(deleted.status).toBe(204);
-
-    const gone = await api<{ error: { code: string } }>('GET', `/api/todos/${created.body.id}`);
-    expect(gone.status).toBe(404);
-    expect(gone.body.error.code).toBe('NOT_FOUND');
-  });
-
-  test('rejects invalid bodies with the error envelope', async () => {
-    const { status, body } = await api<{ error: { code: string; details: unknown[] } }>(
-      'POST',
-      '/api/todos',
-      { body: { title: '' } },
-    );
-    expect(status).toBe(400);
-    expect(body.error.code).toBe('VALIDATION_ERROR');
-    expect(Array.isArray(body.error.details)).toBe(true);
-  });
-
-  test('rejects malformed JSON as a validation error, not a 500', async () => {
-    const response = await fetch(`${baseUrl}/api/todos`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: memberCookie },
-      body: '{not json',
-    });
-    expect(response.status).toBe(400);
-  });
-
+describe('error envelope', () => {
   test('localizes error messages from Accept-Language and ?lang', async () => {
-    const korean = await api<{ error: { message: string } }>('POST', '/api/todos', {
-      body: {},
+    const korean = await api<{ error: { message: string } }>('GET', '/api/none', {
       headers: { 'accept-language': 'ko-KR,ko;q=0.9' },
     });
-    expect(korean.body.error.message).toBe('요청에 잘못된 데이터가 포함되어 있습니다.');
+    expect(korean.body.error.message).toBe('요청한 리소스를 찾을 수 없습니다.');
 
-    const override = await api<{ error: { message: string } }>('GET', '/api/todos/none?lang=ko');
+    const override = await api<{ error: { message: string } }>('GET', '/api/none?lang=ko');
     expect(override.body.error.message).toBe('요청한 리소스를 찾을 수 없습니다.');
-  });
-});
-
-describe('todos list — pagination / sorting / filtering', () => {
-  beforeEach(async () => {
-    for (const title of ['Alpha', 'Bravo', 'Charlie']) {
-      await api('POST', '/api/todos', { body: { title } });
-    }
-    const list = await api<{ items: Todo[] }>('GET', '/api/todos?q=Bravo');
-    const bravo = list.body.items[0];
-    if (!bravo) throw new Error('seed failed');
-    await api('PATCH', `/api/todos/${bravo.id}`, { body: { status: 'done' } });
-  });
-
-  test('returns the Page envelope with working pagination', async () => {
-    const first = await api<{
-      items: Todo[];
-      totalItems: number;
-      totalPages: number;
-      hasNextPage: boolean;
-    }>('GET', '/api/todos?page=1&pageSize=2');
-    expect(first.status).toBe(200);
-    expect(first.body.items).toHaveLength(2);
-    expect(first.body).toMatchObject({ totalItems: 3, totalPages: 2, hasNextPage: true });
-
-    const second = await api<{ items: Todo[]; hasNextPage: boolean }>(
-      'GET',
-      '/api/todos?page=2&pageSize=2',
-    );
-    expect(second.body.items).toHaveLength(1);
-    expect(second.body.hasNextPage).toBe(false);
-  });
-
-  test('filters by status and q', async () => {
-    const done = await api<{ items: Todo[] }>('GET', '/api/todos?status=done');
-    expect(done.body.items.map((todo) => todo.title)).toEqual(['Bravo']);
-
-    const searched = await api<{ items: Todo[] }>('GET', '/api/todos?q=alp');
-    expect(searched.body.items.map((todo) => todo.title)).toEqual(['Alpha']);
-  });
-
-  test('sorts by the whitelisted fields', async () => {
-    const byTitle = await api<{ items: Todo[] }>('GET', '/api/todos?sortBy=title&sortOrder=asc');
-    expect(byTitle.body.items.map((todo) => todo.title)).toEqual(['Alpha', 'Bravo', 'Charlie']);
-  });
-
-  test('rejects out-of-contract list params', async () => {
-    expect((await api('GET', '/api/todos?pageSize=1000')).status).toBe(400);
-    expect((await api('GET', '/api/todos?page=abc')).status).toBe(400);
-    expect((await api('GET', '/api/todos?sortBy=id')).status).toBe(400);
   });
 });
 
 describe('deployment-version handshake', () => {
   test('matching version passes', async () => {
-    const { status } = await api('GET', '/api/todos', {
+    const { status } = await api('GET', '/api/auth/me', {
       headers: { [VERSION_HEADER]: 'dev' },
     });
     expect(status).toBe(200);
   });
 
   test('mismatched version is rejected with 409 VERSION_MISMATCH', async () => {
-    const { status, body } = await api<{ error: { code: string } }>('GET', '/api/todos', {
+    const { status, body } = await api<{ error: { code: string } }>('GET', '/api/auth/me', {
       headers: { [VERSION_HEADER]: 'other-build' },
     });
     expect(status).toBe(409);
@@ -236,13 +134,13 @@ describe('deployment-version handshake', () => {
   });
 
   test('requests without the header (curl, probes) are unaffected', async () => {
-    expect((await api('GET', '/api/todos')).status).toBe(200);
+    expect((await api('GET', '/api/auth/me')).status).toBe(200);
   });
 });
 
 describe('CORS', () => {
   test('preflight from an allowed origin succeeds', async () => {
-    const { status, headers } = await api('OPTIONS', '/api/todos', {
+    const { status, headers } = await api('OPTIONS', '/api/auth/me', {
       headers: { origin: ALLOWED_ORIGIN, 'access-control-request-method': 'POST' },
     });
     expect(status).toBe(204);
@@ -251,7 +149,7 @@ describe('CORS', () => {
   });
 
   test('preflight from a disallowed origin is denied', async () => {
-    const { status, headers } = await api('OPTIONS', '/api/todos', {
+    const { status, headers } = await api('OPTIONS', '/api/auth/me', {
       headers: { origin: 'https://evil.example.com', 'access-control-request-method': 'POST' },
     });
     expect(status).toBe(403);
@@ -259,10 +157,10 @@ describe('CORS', () => {
   });
 
   test('actual responses carry CORS headers only for allowed origins', async () => {
-    const allowed = await api('GET', '/api/todos', { headers: { origin: ALLOWED_ORIGIN } });
+    const allowed = await api('GET', '/api/auth/me', { headers: { origin: ALLOWED_ORIGIN } });
     expect(allowed.headers.get('access-control-allow-origin')).toBe(ALLOWED_ORIGIN);
 
-    const denied = await api('GET', '/api/todos', {
+    const denied = await api('GET', '/api/auth/me', {
       headers: { origin: 'https://evil.example.com' },
     });
     expect(denied.headers.get('access-control-allow-origin')).toBeNull();
@@ -299,7 +197,7 @@ describe('fallback', () => {
   });
 
   test('a method a known API path does not define also gets the JSON 404 envelope', async () => {
-    const { status, body } = await api<{ error: { code: string } }>('PUT', '/api/todos');
+    const { status, body } = await api<{ error: { code: string } }>('PUT', '/api/auth/me');
     expect(status).toBe(404);
     expect(body.error.code).toBe('NOT_FOUND');
   });
@@ -335,7 +233,7 @@ describe('auth (AUTH_DRIVER=oidc)', () => {
     api('GET', `/api/auth/callback?${query}`, { headers: { cookie } });
 
   test('login → the member server → callback: signed in, back where it started', async () => {
-    const { login, location, cookie, state } = await startSignIn('/todos?page=2');
+    const { login, location, cookie, state } = await startSignIn('/design-system?page=2');
     expect(login.status).toBe(302);
     expect(location.origin + location.pathname).toBe(`${issuer.url}/oauth2/auth`);
     expect(location.searchParams.get('client_id')).toBe('test-service');
@@ -344,7 +242,7 @@ describe('auth (AUTH_DRIVER=oidc)', () => {
     const code = issuer.issueCode({ sub: 'alice', name: 'Alice', sid: 'sid-a' });
     const back = await callback(`code=${code}&state=${state}`, cookie);
     expect(back.status).toBe(302);
-    expect(back.headers.get('location')).toBe('/todos?page=2');
+    expect(back.headers.get('location')).toBe('/design-system?page=2');
     expect(cookieFrom(back.headers, SIGN_IN)).toBe(`${SIGN_IN}=`); // used up
     const session = cookieFrom(back.headers, SESSION) ?? '';
 
@@ -453,56 +351,5 @@ describe('auth (AUTH_DRIVER=oidc)', () => {
     const none = loadServerConfig({ DB_DRIVER: 'memory', AUTH_DRIVER: 'none' });
     const app = buildApp(createContainer(none, { log: silentLogger }), state);
     expect(Object.keys(app.routes).filter((path) => path.startsWith('/api/auth'))).toEqual([]);
-  });
-});
-
-describe('todos: members write, guests only read (AUTH_DRIVER=oidc)', () => {
-  test('a guest can list and read todos', async () => {
-    const created = await api<Todo>('POST', '/api/todos', { body: { title: 'Visible' } });
-    expect((await api('GET', '/api/todos', { as: 'guest' })).status).toBe(200);
-    expect((await api('GET', `/api/todos/${created.body.id}`, { as: 'guest' })).status).toBe(200);
-  });
-
-  test('a guest cannot create, update or delete — 401, and nothing changes', async () => {
-    const created = await api<Todo>('POST', '/api/todos', { body: { title: 'Keep me' } });
-    const id = created.body.id;
-
-    const attempts = [
-      await api<{ error: { code: string } }>('POST', '/api/todos', {
-        body: { title: 'Guest todo' },
-        as: 'guest',
-      }),
-      await api<{ error: { code: string } }>('PATCH', `/api/todos/${id}`, {
-        body: { status: 'done' },
-        as: 'guest',
-      }),
-      await api<{ error: { code: string } }>('DELETE', `/api/todos/${id}`, { as: 'guest' }),
-    ];
-    for (const { status, body } of attempts) {
-      expect(status).toBe(401);
-      expect(body.error.code).toBe('UNAUTHORIZED');
-    }
-
-    const list = await api<{ items: Todo[] }>('GET', '/api/todos');
-    expect(list.body.items.map((todo) => [todo.title, todo.status])).toEqual([['Keep me', 'open']]);
-  });
-});
-
-describe('todos without sign-in (AUTH_DRIVER=none)', () => {
-  test('there are no guests to turn away: anyone can write', async () => {
-    const none = loadServerConfig({ DB_DRIVER: 'memory', AUTH_DRIVER: 'none' });
-    const noAuth = createContainer(none, { log: silentLogger });
-    const noAuthServer = Bun.serve({ port: 0, ...buildApp(noAuth, { shuttingDown: false }) });
-    try {
-      const response = await fetch(new URL('/api/todos', noAuthServer.url), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: 'No sign-in needed' }),
-      });
-      expect(response.status).toBe(201);
-    } finally {
-      await noAuthServer.stop(true);
-      await noAuth.dispose();
-    }
   });
 });

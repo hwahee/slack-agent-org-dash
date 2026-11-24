@@ -7,8 +7,8 @@
  *   &<filterField>=<value>       — endpoint-specific flat filter params
  *
  * and MUST respond with the `Page<T>` envelope below. Endpoint-specific
- * validators (see e.g. `@shared/domain/todo`) whitelist their own sortable
- * fields and filter params on top of this base.
+ * validators whitelist their own sortable fields and filter params on top of
+ * this base, using `PAGINATION` for the defaults and cap and `SORT_ORDERS`.
  */
 
 export const PAGINATION = {

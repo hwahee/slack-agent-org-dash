@@ -10,9 +10,10 @@ import { s, toValidator, type Infer } from '@shared/validation';
 const configValidator = toValidator(
   s.object({
     appEnv: s._default(s.enum(['local', 'development', 'production']), 'local'),
-    port: s._default(s.int().check(s.gte(0), s.lte(65535)), 3000),
-    /** `memory` runs without any external service — used by tests and quick hacking. */
-    dbDriver: s._default(s.enum(['postgres', 'memory']), 'postgres'),
+    /** The testbed's port block +0 (docs/testbed/ports.md). */
+    port: s._default(s.int().check(s.gte(0), s.lte(65535)), 40000),
+    /** `memory` (default) runs without any external service; testbeds need no database. */
+    dbDriver: s._default(s.enum(['postgres', 'memory']), 'memory'),
     databaseUrl: s.optional(s.string().check(s.minLength(1))),
     /** Explicit CORS allowlist; empty means same-origin only. */
     corsOrigins: s._default(s.array(s.string().check(s.minLength(1))), []),

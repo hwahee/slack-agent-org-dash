@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { buildPage, searchParamsToObject } from './pagination';
+import { buildPage, PAGINATION, searchParamsToObject, SORT_ORDERS } from './pagination';
 
 describe('buildPage', () => {
   test('computes totals and hasNextPage', () => {
@@ -40,5 +40,13 @@ describe('searchParamsToObject', () => {
   test('non-numeric page stays NaN so validation rejects it', () => {
     const raw = searchParamsToObject(new URLSearchParams('page=abc'));
     expect(Number.isNaN(raw.page)).toBe(true);
+  });
+});
+
+describe('the convention', () => {
+  test('the default page fits under the cap, and both sort orders exist', () => {
+    expect(PAGINATION.defaultPage).toBe(1);
+    expect(PAGINATION.defaultPageSize).toBeLessThanOrEqual(PAGINATION.maxPageSize);
+    expect(SORT_ORDERS).toEqual(['asc', 'desc']);
   });
 });

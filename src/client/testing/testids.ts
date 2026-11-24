@@ -32,9 +32,43 @@ export const TESTID = {
     /** The bottom line's links: the design system, then terms and privacy. */
     footerLegal: 'app.footer.legal',
   },
+  /** The dashboard at `/` (docs/spec.md §11 "대시보드 testid", docs/testbed/dashboard.md). */
   testbed: {
-    /** The `/` page until the dashboard shell arrives (docs/spec.md §10). */
-    placeholder: 'testbed.placeholder',
+    dashboard: 'testbed.dashboard',
+    statusBar: {
+      root: 'testbed.status-bar',
+      /** The state dot; its `aria-label` says `<core>: <state>`, `data-state` the state. */
+      core: (id: string) => `testbed.status-bar.core.${id}`,
+      run: 'testbed.status-bar.run',
+      /** `data-connection`: connecting | open | reconnecting | unauthorized. */
+      connection: 'testbed.status-bar.connection',
+    },
+    leaseBanner: 'testbed.lease-banner',
+    restartNotice: 'testbed.restart-notice',
+    restartDismiss: 'testbed.restart-notice.dismiss',
+    loginRequired: 'testbed.login-required',
+    connection: {
+      root: 'testbed.connection',
+      endpoint: (core: string, name: string) => `testbed.connection.endpoint.${core}.${name}`,
+      copyEndpoint: (core: string, name: string) =>
+        `testbed.connection.copy-endpoint.${core}.${name}`,
+      mcpUrl: 'testbed.connection.mcp-url',
+      copyMcpUrl: 'testbed.connection.copy-mcp-url',
+      copyMcpJson: 'testbed.connection.copy-mcp-json',
+      copyClaudeMd: 'testbed.connection.copy-claude-md',
+    },
+    tabs: {
+      tab: (id: string) => `testbed.tabs.tab.${id}`,
+      panel: 'testbed.tabs.panel',
+    },
+    coreColumn: 'testbed.core-column',
+    coreCard: (id: string) => `testbed.core-card.${id}`,
+    detail: 'testbed.detail',
+    /** Under 1024 px: the buttons that open the side columns as overlays. */
+    openCores: 'testbed.open-cores',
+    openDetail: 'testbed.open-detail',
+    coresOverlay: 'testbed.cores-overlay',
+    detailOverlay: 'testbed.detail-overlay',
   },
   designSystem: {
     page: 'design-system.page',

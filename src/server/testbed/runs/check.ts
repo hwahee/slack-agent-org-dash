@@ -3,6 +3,7 @@
  * (docs/testbed/runs-and-checks.md §2). Not an operation, so no lease.
  */
 import {
+  matchesFilter,
   toEventLine,
   type Caller,
   type EventFilter,
@@ -12,7 +13,6 @@ import {
 import { s, toValidator } from '@shared/validation';
 
 import type { EventBus } from '../events/bus';
-import { matchesFilter } from '../events/filter';
 import type { RunManager } from './runs';
 import type { RunStore } from './store';
 

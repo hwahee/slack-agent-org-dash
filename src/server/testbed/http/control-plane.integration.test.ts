@@ -8,7 +8,7 @@ import type { TestbedEvent } from '@shared/testbed/events';
 
 import { sampleCore } from '../cores/sample';
 import { startTestServer, TcpClient, waitForEvent } from '../testing';
-import type { TestbedSocketMessage } from './ws';
+import type { TestbedSocketMessage } from '@shared/testbed/control';
 
 const stops: (() => Promise<void>)[] = [];
 

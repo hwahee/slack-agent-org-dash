@@ -5,12 +5,18 @@
  * secrets, caps the payload size, keeps the event in the ring buffer and
  * hands it to every subscriber (Run store, WS broadcaster, waiters).
  */
-import type { Actor, EventFilter, EventLevel, TestbedEvent } from '@shared/testbed/events';
+import {
+  matchesFilter,
+  type Actor,
+  type EventFilter,
+  type EventLevel,
+  type TestbedEvent,
+} from '@shared/testbed/events';
 import { nowUtc } from '@shared/time';
 
 import { DEFAULT_MAX_PAYLOAD_BYTES, limitPayload } from '../payload-limit';
 import { redact } from '../redact';
-import { cursorSeq, matchesFilter, queryLimit } from './filter';
+import { cursorSeq, queryLimit } from './filter';
 import { RingBuffer } from './ring-buffer';
 
 const DEFAULT_EVENT_BUFFER = 5000;

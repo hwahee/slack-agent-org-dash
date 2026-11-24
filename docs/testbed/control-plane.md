@@ -194,6 +194,7 @@
   "version": "<git sha>",
   "instanceId": "…",
   "baseVersion": "<testbed-base 버전>",
+  "publicUrl": "http://host:40020",
   "cores": [
     {
       "id": "llm",
@@ -214,6 +215,8 @@
 ```
 
 - `version`은 빌드의 git SHA, `baseVersion`은 이 테스트베드가 머지한 `testbed-base`의 공통 런타임 버전(`src/server/testbed/version.ts`)입니다.
+- `publicUrl`은 `TESTBED_PUBLIC_URL`입니다. 대시보드 연결 패널의 MCP URL과 `.mcp.json` 조각은 모두 이 값으로 만듭니다.
+- 타입은 `src/shared/testbed/control.ts`의 `TestbedManifest`입니다(`TestbedStatus`, WS 메시지 `TestbedSocketMessage`도 같은 곳).
 - `configSchema`와 액션의 `inputSchema`는 검증기에서 만든 JSON Schema입니다(`toJsonSchema`, `@shared/validation`).
 
 ## 7. 인증

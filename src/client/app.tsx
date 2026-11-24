@@ -15,7 +15,7 @@ import { LocaleProvider, useI18n } from './i18n/locale-context';
 import { DesignSystemPage } from './pages/design-system-page';
 import { NotFoundPage } from './pages/not-found-page';
 import { SignInFailedPage } from './pages/sign-in-failed-page';
-import { PlaceholderPage } from './testbed/placeholder-page';
+import { DashboardPage } from './testbed/dashboard/dashboard-page';
 import { TESTID } from './testing/testids';
 import { ThemeProvider } from './theme/theme-context';
 import { Footer } from './ui/footer';
@@ -58,14 +58,16 @@ function Header() {
 /**
  * The chrome wrapped around a routed page.
  *
- * `footer` is the per-route switch for the shared footer. It defaults to
- * `true`, so a new route keeps the footer unless it explicitly opts out —
+ * `footer` is the per-route switch for the shared footer; `wide` lifts the
+ * reading-width cap for pages that lay out side by side (the dashboard).
+ *
+ * `footer` defaults to `true`, so a new route keeps the footer unless it explicitly opts out —
  * the exception has to be declared, never the rule.
  */
-function AppLayout({ footer = true }: { footer?: boolean }) {
+function AppLayout({ footer = true, wide = false }: { footer?: boolean; wide?: boolean }) {
   const { t } = useI18n();
   return (
-    <div className="app-shell">
+    <div className={wide ? 'app-shell app-shell--wide' : 'app-shell'}>
       <a className="skip-link" href="#main">
         {t('common.skipToContent')}
       </a>
@@ -90,8 +92,12 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Standard chrome: header + footer. */}
+      {/* The testbed dashboard needs the whole width. */}
+      <Route element={<AppLayout wide />}>
+        <Route path="/" element={<DashboardPage />} />
+      </Route>
+
       <Route element={<AppLayout />}>
-        <Route path="/" element={<PlaceholderPage />} />
         <Route path="/design-system" element={<DesignSystemPage />} />
         <Route path="/sign-in-failed" element={<SignInFailedPage />} />
         <Route path="*" element={<NotFoundPage />} />

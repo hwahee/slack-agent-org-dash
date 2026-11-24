@@ -9,17 +9,11 @@
  * stream is sampled — one in ten goes out — and each `event` batch says how
  * many were left out. The ring buffer and Run store keep everything.
  */
+import type { TestbedSocketMessage } from '@shared/testbed/control';
 import type { TestbedEvent } from '@shared/testbed/events';
-import type { LeaseView } from '@shared/testbed/lease';
 
-import type { ControlService, TestbedStatus } from '../control/service';
+import type { ControlService } from '../control/service';
 import type { EventBus } from '../events/bus';
-
-export type TestbedSocketMessage =
-  | { type: 'snapshot'; status: TestbedStatus; events: TestbedEvent[] }
-  | { type: 'event'; events: TestbedEvent[]; omitted: number }
-  | { type: 'status'; status: TestbedStatus }
-  | { type: 'lease'; lease: LeaseView | null };
 
 interface Socket {
   send(data: string): unknown;

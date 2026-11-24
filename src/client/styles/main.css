@@ -206,6 +206,234 @@ a {
   padding-top: var(--space-5);
 }
 
+/* The testbed dashboard lays out side by side, so it lifts the width cap. */
+.app-shell--wide {
+  max-width: none;
+}
+
+/* ── Testbed dashboard (docs/testbed/dashboard.md) ──────────────────────── */
+.tb-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tb-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.tb-status-bar__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.tb-status-bar__cores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tb-status-bar__core {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tb-status-bar__connection {
+  margin-left: auto;
+}
+
+.tb-status-bar__connection[data-connection='reconnecting'],
+.tb-status-bar__connection[data-connection='connecting'] {
+  color: var(--color-warning);
+}
+
+/* A core's state at a glance; the words are in aria-label and next to it. */
+.tb-dot {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+}
+
+.tb-dot[data-state='running'] {
+  background: var(--color-success);
+}
+
+.tb-dot[data-state='starting'],
+.tb-dot[data-state='stopping'] {
+  background: var(--color-warning);
+}
+
+.tb-dot[data-state='error'] {
+  background: var(--color-danger);
+}
+
+.tb-dashboard__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tb-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.tb-layout[data-wide] {
+  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr) minmax(16rem, 22rem);
+}
+
+.tb-layout__main,
+.tb-layout__side,
+.tb-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.tb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+}
+
+.tb-panel__title {
+  margin: 0;
+  font-size: var(--font-size-body);
+}
+
+.tb-panel__subtitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-sm);
+}
+
+.tb-connection__list,
+.tb-core-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tb-connection__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.tb-connection__row code {
+  overflow-wrap: anywhere;
+}
+
+.tb-connection__snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.tb-code {
+  margin: 0;
+  padding: var(--space-2);
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  white-space: pre;
+}
+
+.tb-core-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+
+.tb-core-list__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.tb-counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.tb-counters dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.tb-tabs__tab {
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tb-tabs__tab[aria-selected='true'] {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.tb-tabs__tab:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+}
+
+.tb-tabs__panel {
+  padding-top: var(--space-3);
+}
+
+.tb-login {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 32rem;
+}
+
 /* /sign-in-failed: one narrow column. */
 .sign-in-failed {
   max-width: 28rem;

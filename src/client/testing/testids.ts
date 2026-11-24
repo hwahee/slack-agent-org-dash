@@ -63,6 +63,52 @@ export const TESTID = {
     },
     coreColumn: 'testbed.core-column',
     coreCard: (id: string) => `testbed.core-card.${id}`,
+    /** Folds the card to its header; `aria-expanded` says which. */
+    coreCardToggle: (id: string) => `testbed.core-card.toggle.${id}`,
+    /** start / stop / reset; `aria-disabled="true"` while the lease is held. */
+    coreOp: {
+      start: (id: string) => `testbed.core-card.start.${id}`,
+      stop: (id: string) => `testbed.core-card.stop.${id}`,
+      reset: (id: string) => `testbed.core-card.reset.${id}`,
+    },
+    configEditor: {
+      /** The JSON editor's textarea. */
+      root: (id: string) => `testbed.config-editor.${id}`,
+      save: (id: string) => `testbed.config-editor.save.${id}`,
+      /** Validation issues (`path: message`) or the error sentence. */
+      errors: (id: string) => `testbed.config-editor.errors.${id}`,
+      restartNotice: (id: string) => `testbed.config-editor.restart-notice.${id}`,
+      restartNow: (id: string) => `testbed.config-editor.restart-now.${id}`,
+    },
+    /** Inside every lock-aware editor (config, action form, fault rules) — scope by its container. */
+    editor: {
+      lockedNotice: 'testbed.editor.locked-notice',
+      copyInput: 'testbed.editor.copy-input',
+      serverChanged: 'testbed.editor.server-changed',
+      reload: 'testbed.editor.reload',
+      keep: 'testbed.editor.keep',
+    },
+    action: {
+      /** Opens the action's form (`aria-expanded`). */
+      root: (core: string, name: string) => `testbed.action.${core}.${name}`,
+      run: (core: string, name: string) => `testbed.action.run.${core}.${name}`,
+      result: (core: string, name: string) => `testbed.action.result.${core}.${name}`,
+      /** One input; `json` for the JSON editor fallback. */
+      field: (core: string, name: string, field: string) =>
+        `testbed.action.field.${core}.${name}.${field}`,
+    },
+    faults: {
+      root: (id: string) => `testbed.faults.${id}`,
+      add: (id: string) => `testbed.faults.add.${id}`,
+      save: (id: string) => `testbed.faults.save.${id}`,
+      row: (id: string, index: number) => `testbed.faults.row.${id}.${index}`,
+      /** column: id | match | probability | delayMs | times | effect | error */
+      cell: (id: string, index: number, column: string) =>
+        `testbed.faults.cell.${id}.${index}.${column}`,
+      up: (id: string, index: number) => `testbed.faults.up.${id}.${index}`,
+      down: (id: string, index: number) => `testbed.faults.down.${id}.${index}`,
+      remove: (id: string, index: number) => `testbed.faults.remove.${id}.${index}`,
+    },
     detail: 'testbed.detail',
     /** Under 1024 px: the buttons that open the side columns as overlays. */
     openCores: 'testbed.open-cores',

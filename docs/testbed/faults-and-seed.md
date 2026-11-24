@@ -32,3 +32,12 @@ interface FaultRule {
 - 외부 코어에는 `initialize`와 `runChanged`의 `seed`로 전달합니다.
 - 결함 판정(`probability`, `delayMs` 범위)도 `ctx.rng`를 씁니다.
 - 시간과 동시성 때문에 완전한 재현은 보장하지 않습니다. 보장 범위는 **"같은 seed면 같은 결함 판정 순서, 같은 생성 데이터"**입니다.
+
+## 3. 코드 위치
+
+- `FaultRule` 타입: `src/shared/testbed/faults.ts`
+- `SeededRng`(seed 문자열의 sha256으로 시작하는 sfc32), `generateSeed`: `src/server/testbed/rng.ts`
+- `FaultDecider`(`ctx.faults`): `src/server/testbed/faults.ts`. `decide(selector, correlationId?)`가 적용할 규칙의
+  효과(`ruleId`, `delayMs`, `error`, `disconnect`, `corrupt`)를 돌려주고, 적용할 때마다 `testbed.fault.injected`를
+  내도록 받은 콜백을 부릅니다. `setRules`와 `reset`은 `times` 횟수를 초기화합니다.
+- `RunManager.rng()`가 열린 Run의 rng(그 Run의 seed), Run 밖이면 부팅 rng를 돌려줍니다.

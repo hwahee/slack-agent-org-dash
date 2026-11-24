@@ -37,15 +37,16 @@ bun run dev        # http://localhost:40000
 `cp .env.example .env` 후 고칩니다. 공통 환경 변수는
 [docs/testbed/architecture.md §7](docs/testbed/architecture.md#7-공통-환경-변수)에 있습니다.
 
-| 명령            | 설명                                                               |
-| --------------- | ------------------------------------------------------------------ |
-| `bun run dev`   | 개발 모드. 서버 자동 재시작 + 클라이언트 HMR                       |
-| `bun test`      | 단위 + 통합 테스트. 외부 환경 불필요                               |
-| `bun run check` | prettier → eslint → tsc → knip → test (CI·pre-push와 동일)         |
-| `bun run build` | 프로덕션 빌드 → `dist/` (서버가 클라이언트를 포함하는 단일 산출물) |
-| `bun run start` | 빌드 산출물 실행                                                   |
+| 명령                    | 설명                                                                                                                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run dev`           | 개발 모드. 서버 자동 재시작 + 클라이언트 HMR                                                                                                                                                 |
+| `bun test`              | 단위 + 통합 테스트. 외부 환경 불필요                                                                                                                                                         |
+| `bun run check`         | prettier → eslint → tsc → knip → test (CI·pre-push와 동일)                                                                                                                                   |
+| `bun run testbed:smoke` | MCP 스모크: 서버를 띄워 공통 점검·시나리오·액션 커버리지 실행(`--url <base>`로 떠 있는 인스턴스 대상). [verification.md §4](docs/testbed/verification.md#4-mcp-스모크--bun-run-testbedsmoke) |
+| `bun run build`         | 프로덕션 빌드 → `dist/` (서버가 클라이언트를 포함하는 단일 산출물)                                                                                                                           |
+| `bun run start`         | 빌드 산출물 실행                                                                                                                                                                             |
 
-제어면(REST)으로 조작하고 관찰합니다. 자세한 규약은 [docs/testbed/control-plane.md](docs/testbed/control-plane.md)에 있습니다.
+제어면(REST, MCP `/testbed/mcp`)으로 조작하고 관찰합니다. 자세한 규약은 [docs/testbed/control-plane.md](docs/testbed/control-plane.md)에 있습니다.
 
 ```bash
 curl -s localhost:40000/testbed/api/manifest                     # 코어, 데이터면 주소, 제어면 경로

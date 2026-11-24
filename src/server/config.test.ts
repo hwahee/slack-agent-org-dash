@@ -3,6 +3,15 @@ import { describe, expect, test } from 'bun:test';
 import { testOidcEnv } from './auth/fake-issuer';
 import { loadServerConfig } from './config';
 
+describe('loadServerConfig — testbed defaults', () => {
+  test('with no environment at all: memory DB, no sign-in, the port block +0', () => {
+    const config = loadServerConfig({});
+    expect(config.dbDriver).toBe('memory');
+    expect(config.authDriver).toBe('none');
+    expect(config.port).toBe(40000);
+  });
+});
+
 describe('loadServerConfig — AUTH_DRIVER', () => {
   test('defaults to none: sign-in is opt-in', () => {
     expect(loadServerConfig({ DB_DRIVER: 'memory' }).authDriver).toBe('none');

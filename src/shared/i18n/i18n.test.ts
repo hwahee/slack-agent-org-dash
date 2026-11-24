@@ -4,8 +4,8 @@ import { negotiateLocale, translate } from './index';
 
 describe('translate', () => {
   test('returns catalog text per locale', () => {
-    expect(translate('en', 'todos.title')).toBe('Todos');
-    expect(translate('ko', 'todos.title')).toBe('할 일');
+    expect(translate('en', 'notFound.title')).toBe('Page not found');
+    expect(translate('ko', 'notFound.title')).toBe('페이지를 찾을 수 없습니다');
   });
 
   test('interpolates {placeholders}', () => {

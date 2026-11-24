@@ -2,8 +2,8 @@
  * Cross-instance pub/sub contract.
  *
  * When the server scales horizontally, instances need a shared bus (e.g. to
- * fan WebSocket notifications out to sockets connected to *other* instances,
- * or to distribute background jobs). Services depend on this interface only;
+ * fan notifications out to sockets connected to *other* instances, or to
+ * distribute background jobs). Services depend on this interface only;
  * the driver is chosen by configuration:
  *
  *   - `memory` — single-process bus, for one instance / local dev / tests.
@@ -21,12 +21,6 @@ export interface PubSub {
 
 /** Well-known channels. Add new ones here, never as ad-hoc strings. */
 export const CHANNELS = {
-  /** Emitted after any todo mutation; payload: { action, todoId }. */
-  todosChanged: 'todos.changed',
-  /** Emitted after a chat message is stored; payload: ChatMessage. */
-  chatMessages: 'chat.messages',
-  /** Emitted when a connection joins or leaves a chat room; payload: the change (chat-gateway.ts). */
-  chatPresence: 'chat.presence',
   /** Background job queue consumed by worker-role processes. */
   jobs: 'jobs',
 } as const;

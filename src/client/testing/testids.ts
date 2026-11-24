@@ -7,7 +7,7 @@
  *   - Never write a `data-testid` string inline in a component; add it here.
  *   - Format: `{page}.{section}.{element}`, kebab-case segments.
  *   - Dynamic ids (per-entity elements) are factory functions taking the
- *     entity id, e.g. `TESTID.todos.item(todo.id)`.
+ *     entity id, e.g. `TESTID.designSystem.section(name)`.
  */
 export const TESTID = {
   app: {
@@ -32,41 +32,9 @@ export const TESTID = {
     /** The bottom line's links: the design system, then terms and privacy. */
     footerLegal: 'app.footer.legal',
   },
-  todos: {
-    page: 'todos.page',
-    createForm: 'todos.create.form',
-    createInput: 'todos.create.input',
-    createSubmit: 'todos.create.submit',
-    guestHint: 'todos.guest-hint',
-    filterStatus: 'todos.filter.status',
-    sortBy: 'todos.sort.by',
-    list: 'todos.list',
-    item: (id: string) => `todos.item.${id}`,
-    itemToggle: (id: string) => `todos.item.${id}.toggle`,
-    itemDelete: (id: string) => `todos.item.${id}.delete`,
-    loading: 'todos.loading',
-    error: 'todos.error',
-    errorRetry: 'todos.error.retry',
-    empty: 'todos.empty',
-    totalCount: 'todos.total-count',
-    pagination: 'todos.pagination',
-    paginationPrev: 'todos.pagination.prev',
-    paginationNext: 'todos.pagination.next',
-    paginationStatus: 'todos.pagination.status',
-  },
-  home: {
-    page: 'home.page',
-    chat: {
-      panel: 'home.chat.panel',
-      status: 'home.chat.status',
-      participants: 'home.chat.participants',
-      log: 'home.chat.log',
-      message: (seq: number) => `home.chat.message.${seq}`,
-      empty: 'home.chat.empty',
-      form: 'home.chat.form',
-      input: 'home.chat.input',
-      send: 'home.chat.send',
-    },
+  testbed: {
+    /** The `/` page until the dashboard shell arrives (docs/spec.md §10). */
+    placeholder: 'testbed.placeholder',
   },
   designSystem: {
     page: 'design-system.page',

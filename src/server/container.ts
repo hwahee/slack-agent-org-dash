@@ -13,48 +13,19 @@
  */
 import { createOidcClient, type OidcClient } from './auth/oidc';
 import type { ServerConfig } from './config';
-import { createPostgresDb, createPostgresUnitOfWork, type PostgresDb } from './db/postgres';
+import { createPostgresDb, type PostgresDb } from './db/postgres';
 import { createLogger, type Logger } from './lib/log';
-import { createPresenceStore, type PresenceStore } from './presence';
 import { createPubSub, type PubSub } from './pubsub';
-import { ChatGateway } from './realtime/chat-gateway';
-import {
-  createMemoryAuditLogRepository,
-  createMemoryChatMessageRepository,
-  createMemoryChatRoomRepository,
-  createMemoryTodoRepository,
-  createMemoryUnitOfWork,
-  MemoryStore,
-} from './repositories/memory';
-import {
-  createPostgresAuditLogRepository,
-  createPostgresChatMessageRepository,
-  createPostgresChatRoomRepository,
-  createPostgresTodoRepository,
-} from './repositories/postgres';
-import type {
-  AuditLogRepository,
-  ChatMessageRepository,
-  ChatRoomRepository,
-  TodoRepository,
-  UnitOfWork,
-} from './repositories/types';
-import { ChatService } from './services/chat-service';
-import { TodoService } from './services/todo-service';
 
 export interface Container {
   readonly config: ServerConfig;
   readonly log: Logger;
-  todoService(): TodoService;
   /** Signs members in through the member server; only with AUTH_DRIVER=oidc. */
   oidcClient(): OidcClient;
-  chatService(): ChatService;
-  /** This process's chat sockets — one per process, like everything here. */
-  chatGateway(): ChatGateway;
   pubsub(): PubSub;
   /** Health probe: is the persistence layer reachable? */
   dbPing(): Promise<boolean>;
-  /** Closes every held resource (DB pool, pub/sub and presence connections). */
+  /** Closes every held resource (DB pool, pub/sub connections). */
   dispose(): Promise<void>;
 }
 
@@ -74,7 +45,6 @@ function lazy<T>(factory: () => T): () => T {
 export interface ContainerOverrides {
   log?: Logger;
   pubsub?: PubSub;
-  presence?: PresenceStore;
 }
 
 export function createContainer(
@@ -90,80 +60,18 @@ export function createContainer(
     postgresCreated = true;
     return createPostgresDb(config.databaseUrl);
   });
-  const memoryStore = lazy(() => new MemoryStore());
-
-  const todoRepository = lazy<TodoRepository>(() =>
-    config.dbDriver === 'postgres'
-      ? createPostgresTodoRepository(postgres())
-      : createMemoryTodoRepository(memoryStore()),
-  );
-  const auditLogRepository = lazy<AuditLogRepository>(() =>
-    config.dbDriver === 'postgres'
-      ? createPostgresAuditLogRepository(postgres())
-      : createMemoryAuditLogRepository(memoryStore()),
-  );
-  const chatRoomRepository = lazy<ChatRoomRepository>(() =>
-    config.dbDriver === 'postgres'
-      ? createPostgresChatRoomRepository(postgres())
-      : createMemoryChatRoomRepository(memoryStore()),
-  );
-  const chatMessageRepository = lazy<ChatMessageRepository>(() =>
-    config.dbDriver === 'postgres'
-      ? createPostgresChatMessageRepository(postgres())
-      : createMemoryChatMessageRepository(memoryStore()),
-  );
-  const unitOfWork = lazy<UnitOfWork>(() =>
-    config.dbDriver === 'postgres'
-      ? createPostgresUnitOfWork(postgres())
-      : createMemoryUnitOfWork(memoryStore()),
-  );
 
   const pubsub = lazy<PubSub>(() => overrides.pubsub ?? createPubSub(config));
-  const presence = lazy<PresenceStore>(() => overrides.presence ?? createPresenceStore(config));
-
-  const todoService = lazy(
-    () =>
-      new TodoService({
-        todos: todoRepository(),
-        auditLogs: auditLogRepository(),
-        uow: unitOfWork(),
-        events: pubsub(),
-      }),
-  );
 
   const oidcClient = lazy<OidcClient>(() => {
     if (!config.oidc) throw new Error('AUTH_DRIVER=oidc is not configured');
     return createOidcClient(config.oidc);
   });
 
-  const chatService = lazy(
-    () =>
-      new ChatService({
-        rooms: chatRoomRepository(),
-        messages: chatMessageRepository(),
-        uow: unitOfWork(),
-        events: pubsub(),
-      }),
-  );
-
-  const chatGateway = lazy(
-    () =>
-      new ChatGateway({
-        config,
-        chat: chatService(),
-        presence: presence(),
-        events: pubsub(),
-        log,
-      }),
-  );
-
   return {
     config,
     log,
-    todoService,
     oidcClient,
-    chatService,
-    chatGateway,
     pubsub,
     async dbPing() {
       if (config.dbDriver === 'memory') return true;
@@ -171,7 +79,6 @@ export function createContainer(
     },
     async dispose() {
       await pubsub().close();
-      await presence().close();
       if (postgresCreated) await postgres().close();
     },
   };

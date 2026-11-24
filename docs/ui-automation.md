@@ -12,7 +12,7 @@
    [`src/client/testing/testids.ts`](../src/client/testing/testids.ts)의 `TESTID` 레지스트리입니다.
    테스트 코드도 같은 레지스트리를 import해서 selector 오타·드리프트를 없앱니다.
 3. **네이밍**: `{page}.{section}.{element}`, kebab-case.
-   엔티티별 요소는 팩토리 함수 — 예: `TESTID.todos.item(todo.id)` → `todos.item.<uuid>`.
+   엔티티별 요소는 팩토리 함수 — 예: `TESTID.designSystem.section(name)` → `design-system.section.<name>`.
 4. **ARIA 우선 선택**: 시맨틱이 있는 곳은 role/label 기반 selector
    (`getByRole('button', { name: … })`)를 우선 사용하고, testid는 안정적인 앵커/폴백으로
    사용하세요. 모든 컨트롤은 접근 가능한 이름(label, `aria-label`)을 갖습니다.
@@ -52,14 +52,7 @@
 | 계정 (헤더)   | `app.account.sign-in`, `app.account.user` / `.sign-out`                                                                                         |
 | 푸터          | `app.footer`, `app.controls.*`, `app.nav.design-system`, `app.footer.services`, `app.footer.github`, `app.footer.copyright`, `app.footer.legal` |
 | 로그인 실패   | `sign-in-failed.page`, `sign-in-failed.message`, `sign-in-failed.retry` / `.home-link`                                                          |
-| Todos 생성    | `todos.create.form` / `.input` / `.submit` (+ `todos.create.input.error`)                                                                       |
-| Todos 게스트  | `todos.guest-hint` — 게스트에게 쓰기 대신 보이는 안내 (쓰기 UI는 회원에게만 렌더링)                                                             |
-| Todos 목록    | `todos.list`, `todos.item.<id>`, `todos.item.<id>.toggle`, `todos.item.<id>.delete`                                                             |
-| Todos 상태    | `todos.loading`, `todos.error`, `todos.error.retry`, `todos.empty`, `todos.total-count`                                                         |
-| 필터/정렬     | `todos.filter.status`, `todos.sort.by`                                                                                                          |
-| 페이지네이션  | `todos.pagination` / `.prev` / `.next` / `.status`                                                                                              |
-| 홈 채팅       | `home.page`, `home.chat.panel` / `.status` / `.participants` / `.log` / `.empty`                                                                |
-| 홈 채팅 입력  | `home.chat.form` / `.input` / `.send` (+ `home.chat.input.error`), `home.chat.message.<seq>`                                                    |
+| 테스트베드    | `testbed.placeholder` — `/`의 빈 자리 페이지 (대시보드 셸 전까지)                                                                               |
 | 디자인 시스템 | `design-system.page`, `design-system.section.<name>`, `ds.*` (쇼케이스 컴포넌트)                                                                |
 | NotFound      | `not-found.page`, `not-found.home-link`                                                                                                         |
 
@@ -71,7 +64,7 @@
 
 테마·디자인·언어 컨트롤(`app.controls.*`)은 헤더가 아니라 푸터의 정체성 행에 있습니다 — testid는 그대로이므로 selector는 바뀌지 않지만, 스크롤이 필요할 수 있습니다.
 
-헤더에는 내비게이션이 없습니다. 디자인 시스템 링크(`app.nav.design-system`)는 푸터 하단 줄의 약관 링크 앞(`app.footer.legal` 안)으로 옮겼고 testid는 그대로입니다. 할 일 링크(`app.nav.todos`)는 없어졌고, 홈으로는 헤더의 서비스명(`app.header.home-link`)으로 갑니다.
+헤더에는 내비게이션이 없습니다. 디자인 시스템 링크(`app.nav.design-system`)는 푸터 하단 줄의 약관 링크 앞(`app.footer.legal` 안)으로 옮겼고 testid는 그대로입니다. 홈으로는 헤더의 서비스명(`app.header.home-link`)으로 갑니다.
 
 푸터의 `app.footer.services`는 `/sitemap.json` 응답이 도착한 뒤에만 존재합니다 — 서비스 목록을 검증하는 테스트는 이 요소의 등장을 기다리세요. 로딩·실패 시에는 컬럼 제목만 남고 목록 자체가 렌더링되지 않으므로, 그 상태를 나타내는 별도 신호는 없습니다.
 
@@ -106,11 +99,9 @@ test('picks a preset color', async ({ page }) => {
 ```ts
 import { TESTID } from '../src/client/testing/testids';
 
-test('creates a todo', async ({ page }) => {
+test('shows the testbed placeholder at /', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId(TESTID.todos.createInput).fill('Write e2e tests');
-  await page.getByTestId(TESTID.todos.createSubmit).click();
-  await expect(page.getByTestId(TESTID.todos.list)).toContainText('Write e2e tests');
+  await expect(page.getByTestId(TESTID.testbed.placeholder)).toBeVisible();
 });
 
 test('switches to the contrast skin', async ({ page }) => {

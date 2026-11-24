@@ -14,12 +14,12 @@ RUN bun run build
 FROM oven/bun:1.4.2-slim AS runtime
 WORKDIR /app
 ENV APP_ENV=production
-ENV PORT=3000
+ENV PORT=40000
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/migrations ./migrations
 
-EXPOSE 3000
+EXPOSE 40000
 
 # The bundled client assets are resolved relative to the working directory.
 WORKDIR /app/dist

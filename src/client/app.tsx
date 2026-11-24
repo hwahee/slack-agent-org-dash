@@ -13,9 +13,9 @@ import { isRetryableError } from './api/http';
 import { AccountControls } from './auth/account-controls';
 import { LocaleProvider, useI18n } from './i18n/locale-context';
 import { DesignSystemPage } from './pages/design-system-page';
-import { HomePage } from './pages/home-page';
 import { NotFoundPage } from './pages/not-found-page';
 import { SignInFailedPage } from './pages/sign-in-failed-page';
+import { PlaceholderPage } from './testbed/placeholder-page';
 import { TESTID } from './testing/testids';
 import { ThemeProvider } from './theme/theme-context';
 import { Footer } from './ui/footer';
@@ -91,7 +91,7 @@ function AppRoutes() {
     <Routes>
       {/* Standard chrome: header + footer. */}
       <Route element={<AppLayout />}>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<PlaceholderPage />} />
         <Route path="/design-system" element={<DesignSystemPage />} />
         <Route path="/sign-in-failed" element={<SignInFailedPage />} />
         <Route path="*" element={<NotFoundPage />} />

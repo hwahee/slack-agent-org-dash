@@ -52,9 +52,36 @@
 | 계정 (헤더)   | `app.account.sign-in`, `app.account.user` / `.sign-out`                                                                                         |
 | 푸터          | `app.footer`, `app.controls.*`, `app.nav.design-system`, `app.footer.services`, `app.footer.github`, `app.footer.copyright`, `app.footer.legal` |
 | 로그인 실패   | `sign-in-failed.page`, `sign-in-failed.message`, `sign-in-failed.retry` / `.home-link`                                                          |
-| 테스트베드    | `testbed.placeholder` — `/`의 빈 자리 페이지 (대시보드 셸 전까지)                                                                               |
+| 테스트베드    | 아래 "테스트베드 대시보드" 절                                                                                                                   |
 | 디자인 시스템 | `design-system.page`, `design-system.section.<name>`, `ds.*` (쇼케이스 컴포넌트)                                                                |
 | NotFound      | `not-found.page`, `not-found.home-link`                                                                                                         |
+
+### 테스트베드 대시보드 (`/`)
+
+공통 컴포넌트는 `TESTID.testbed.*`이고, 코어 고유 화면은 `TESTID.<core>.*`입니다([testbed/dashboard.md](testbed/dashboard.md)).
+
+| testid                                                                                         | 요소                                                                                            |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `testbed.dashboard`                                                                            | 대시보드 전체                                                                                   |
+| `testbed.status-bar`                                                                           | 상태 바                                                                                         |
+| `testbed.status-bar.core.<id>`                                                                 | 코어 상태 점. `aria-label`은 `<core>: <state>`, `data-state`는 상태                             |
+| `testbed.status-bar.run`                                                                       | 열린 Run 표시(없으면 "열린 Run 없음")                                                           |
+| `testbed.status-bar.connection`                                                                | 실시간 연결 상태. `data-connection`: `connecting` \| `open` \| `reconnecting` \| `unauthorized` |
+| `testbed.lease-banner`                                                                         | 락 배너(락이 있을 때만 존재)                                                                    |
+| `testbed.restart-notice` / `.dismiss`                                                          | "테스트베드가 재시작됨" 알림과 닫기                                                             |
+| `testbed.login-required`                                                                       | 로그인이 필요할 때 대시보드 대신 보이는 안내                                                    |
+| `testbed.connection`                                                                           | 연결 패널                                                                                       |
+| `testbed.connection.endpoint.<core>.<name>` / `testbed.connection.copy-endpoint.<core>.<name>` | 데이터면 주소와 복사                                                                            |
+| `testbed.connection.mcp-url` / `.copy-mcp-url`                                                 | 제어면 MCP URL과 복사                                                                           |
+| `testbed.connection.copy-mcp-json` / `.copy-claude-md`                                         | `.mcp.json` 조각, CLAUDE.md 스니펫 복사                                                         |
+| `testbed.tabs.tab.<id>` / `testbed.tabs.panel`                                                 | 주 영역 탭(`aria-selected`)과 내용                                                              |
+| `testbed.core-column` / `testbed.core-card.<id>`                                               | 코어 열과 코어 카드                                                                             |
+| `testbed.detail`                                                                               | 상세 패널                                                                                       |
+| `testbed.open-cores` / `testbed.open-detail`                                                   | 1024px 미만에서 코어 열·상세를 여는 버튼                                                        |
+| `testbed.cores-overlay` / `testbed.detail-overlay`                                             | 그때 열리는 사이드바·바텀시트(`.panel`, `.close` 파생)                                          |
+
+- 락 상태는 `<html data-lease="none|agent|ci">`와 조작 컨트롤의 `aria-disabled="true"`로 관찰합니다.
+- 실시간 값은 WS로 100ms 묶음으로 들어오므로 고정 시간 대신 요소·속성의 변화를 기다립니다.
 
 `TextField`는 에러 표시 시 자동으로 `` `${testId}.error` `` 요소를 추가합니다. `TextArea`도 같고,
 힌트(글자 수 등)가 있으면 `` `${testId}.hint` ``를 더합니다.
@@ -99,9 +126,12 @@ test('picks a preset color', async ({ page }) => {
 ```ts
 import { TESTID } from '../src/client/testing/testids';
 
-test('shows the testbed placeholder at /', async ({ page }) => {
+test('shows the sample core running at /', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId(TESTID.testbed.placeholder)).toBeVisible();
+  await expect(page.getByTestId(TESTID.testbed.statusBar.core('sample'))).toHaveAttribute(
+    'data-state',
+    'running',
+  );
 });
 
 test('switches to the contrast skin', async ({ page }) => {

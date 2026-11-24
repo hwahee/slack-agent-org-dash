@@ -3,7 +3,7 @@
  * (docs/testbed/control-plane.md §1.2) and the cursor format
  * (docs/testbed/events.md §3).
  */
-import { EVENT_LEVELS, type EventFilter, type TestbedEvent } from '@shared/testbed/events';
+import type { EventFilter } from '@shared/testbed/events';
 
 import { TestbedError } from '../errors';
 
@@ -33,31 +33,4 @@ export function cursorSeq(cursor: string, instanceId: string): number {
     );
   }
   return seq;
-}
-
-/**
- * Whether `event` passes every field of `filter` except `runId`, `after` and
- * `limit`, which choose *where* to look rather than *what* matches.
- */
-export function matchesFilter(event: TestbedEvent, filter: EventFilter): boolean {
-  if (filter.core !== undefined && event.core !== filter.core) return false;
-  if (
-    filter.kind !== undefined &&
-    event.kind !== filter.kind &&
-    !event.kind.startsWith(`${filter.kind}.`)
-  ) {
-    return false;
-  }
-  if (
-    filter.level !== undefined &&
-    EVENT_LEVELS.indexOf(event.level) < EVENT_LEVELS.indexOf(filter.level)
-  ) {
-    return false;
-  }
-  if (filter.actor !== undefined && event.actor !== filter.actor) return false;
-  if (filter.correlationId !== undefined && event.correlationId !== filter.correlationId) {
-    return false;
-  }
-  if (filter.text !== undefined && !event.summary.includes(filter.text)) return false;
-  return true;
 }

@@ -7,16 +7,21 @@
  * extend it for its holder; operations need the lease (or no one holding it)
  * and leave a `testbed.control.invoked` event with their outcome.
  */
+import type { TestbedManifest, TestbedStatus } from '@shared/testbed/control';
 import type { CoreStatus } from '@shared/testbed/core';
-import type { Caller, EventFilter, TestbedEvent } from '@shared/testbed/events';
-import type { LeaseView } from '@shared/testbed/lease';
+import {
+  matchesFilter,
+  type Caller,
+  type EventFilter,
+  type TestbedEvent,
+} from '@shared/testbed/events';
 import type { RunMeta } from '@shared/testbed/runs';
 import { toJsonSchema } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
 import type { BaseCoreConfig } from '../core';
 import { TestbedError } from '../errors';
-import { matchesFilter, queryLimit } from '../events/filter';
+import { queryLimit } from '../events/filter';
 import { runCheck, type CheckInput, type CheckResult } from '../runs/check';
 import type { TestbedRuntime } from '../runtime';
 import { publicCaller } from './caller';
@@ -36,13 +41,6 @@ export interface ManifestInfo {
   runStore: 'memory' | 'file';
   /** `TESTBED_PUBLIC_URL`, for addresses handed to callers. */
   publicUrl: string;
-}
-
-export interface TestbedStatus {
-  instanceId: string;
-  cores: CoreStatus[];
-  run: RunMeta | null;
-  lease: LeaseView | null;
 }
 
 export interface StartRunRequest {
@@ -83,7 +81,7 @@ export class ControlService {
 
   // ── Reads ────────────────────────────────────────────────────────────────
 
-  getManifest(caller: Caller) {
+  getManifest(caller: Caller): TestbedManifest {
     this.read(caller, 'getManifest');
     const { host, bus } = this.rt;
     return {
@@ -91,6 +89,7 @@ export class ControlService {
       version: this.info.version,
       instanceId: bus.instanceId,
       baseVersion: this.info.baseVersion,
+      publicUrl: this.info.publicUrl,
       cores: host.definitions().map((definition) => {
         const status = host.status(definition.id);
         return {

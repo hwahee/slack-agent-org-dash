@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { sampleCore } from '../cores/sample';
 import { createTestControlPlane } from '../testing';
-import type { TestbedSocketMessage } from './ws';
+import type { TestbedSocketMessage } from '@shared/testbed/control';
 
 describe('WS back-pressure', () => {
   test('above 200 events a second the stream is sampled and the batches count what was left out', async () => {

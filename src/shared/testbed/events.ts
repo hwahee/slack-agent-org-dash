@@ -7,7 +7,7 @@
 import type { UtcIsoString } from '@shared/time';
 import { s, toValidator } from '@shared/validation';
 
-export const EVENT_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
+const EVENT_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type EventLevel = (typeof EVENT_LEVELS)[number];
 
 export type Actor = 'product' | 'human' | 'agent' | 'ci' | 'system';
@@ -105,3 +105,30 @@ export const eventFilterSchema = s.object({
 
 /** Validates a filter from a request (JSON body, or query string values coerced by the caller). */
 export const eventFilterValidator = toValidator(eventFilterSchema);
+
+/**
+ * Whether `event` passes every field of `filter` except `runId`, `after` and
+ * `limit`, which choose *where* to look rather than *what* matches.
+ */
+export function matchesFilter(event: TestbedEvent, filter: EventFilter): boolean {
+  if (filter.core !== undefined && event.core !== filter.core) return false;
+  if (
+    filter.kind !== undefined &&
+    event.kind !== filter.kind &&
+    !event.kind.startsWith(`${filter.kind}.`)
+  ) {
+    return false;
+  }
+  if (
+    filter.level !== undefined &&
+    EVENT_LEVELS.indexOf(event.level) < EVENT_LEVELS.indexOf(filter.level)
+  ) {
+    return false;
+  }
+  if (filter.actor !== undefined && event.actor !== filter.actor) return false;
+  if (filter.correlationId !== undefined && event.correlationId !== filter.correlationId) {
+    return false;
+  }
+  if (filter.text !== undefined && !event.summary.includes(filter.text)) return false;
+  return true;
+}

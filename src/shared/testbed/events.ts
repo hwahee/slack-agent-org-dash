@@ -47,6 +47,31 @@ export interface TestbedEvent<P = unknown> {
   truncated?: boolean;
 }
 
+/**
+ * One event without its payload — what agents get in lists
+ * (docs/testbed/control-plane.md §4).
+ */
+export interface EventLine {
+  id: string;
+  ts: UtcIsoString;
+  level: EventLevel;
+  kind: string;
+  summary: string;
+  correlationId?: string;
+}
+
+export function toEventLine(event: TestbedEvent): EventLine {
+  const { id, ts, level, kind, summary, correlationId } = event;
+  return {
+    id,
+    ts,
+    level,
+    kind,
+    summary,
+    ...(correlationId === undefined ? {} : { correlationId }),
+  };
+}
+
 export interface EventFilter {
   /** A Run id, or `'current'` for the open Run. */
   runId?: string;
@@ -65,17 +90,18 @@ export interface EventFilter {
   limit?: number;
 }
 
+/** The filter's schema, for inputs that embed it (MCP `wait_for`, `check`). */
+export const eventFilterSchema = s.object({
+  runId: s.optional(s.string().check(s.minLength(1))),
+  core: s.optional(s.string().check(s.minLength(1))),
+  kind: s.optional(s.string().check(s.minLength(1))),
+  level: s.optional(s.enum(EVENT_LEVELS)),
+  actor: s.optional(s.enum(['product', 'human', 'agent', 'ci', 'system'])),
+  correlationId: s.optional(s.string().check(s.minLength(1))),
+  text: s.optional(s.string().check(s.minLength(1))),
+  after: s.optional(s.string().check(s.minLength(1))),
+  limit: s.optional(s.int().check(s.gte(1), s.lte(500))),
+});
+
 /** Validates a filter from a request (JSON body, or query string values coerced by the caller). */
-export const eventFilterValidator = toValidator(
-  s.object({
-    runId: s.optional(s.string().check(s.minLength(1))),
-    core: s.optional(s.string().check(s.minLength(1))),
-    kind: s.optional(s.string().check(s.minLength(1))),
-    level: s.optional(s.enum(EVENT_LEVELS)),
-    actor: s.optional(s.enum(['product', 'human', 'agent', 'ci', 'system'])),
-    correlationId: s.optional(s.string().check(s.minLength(1))),
-    text: s.optional(s.string().check(s.minLength(1))),
-    after: s.optional(s.string().check(s.minLength(1))),
-    limit: s.optional(s.int().check(s.gte(1), s.lte(500))),
-  }),
-);
+export const eventFilterValidator = toValidator(eventFilterSchema);

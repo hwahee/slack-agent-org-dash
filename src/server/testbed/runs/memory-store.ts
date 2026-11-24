@@ -36,5 +36,8 @@ export function createMemoryRunStore(retention = DEFAULT_RUN_RETENTION): RunStor
     events(runId) {
       return Promise.resolve([...(runs.get(runId)?.events ?? [])]);
     },
+    location() {
+      return undefined;
+    },
   };
 }

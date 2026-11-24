@@ -34,6 +34,8 @@ export interface ManifestInfo {
   /** `bearer` when `TESTBED_CONTROL_TOKEN` is set. */
   authControl: 'none' | 'bearer';
   runStore: 'memory' | 'file';
+  /** `TESTBED_PUBLIC_URL`, for addresses handed to callers. */
+  publicUrl: string;
 }
 
 export interface TestbedStatus {
@@ -156,22 +158,20 @@ export class ControlService {
   async queryEvents(
     filter: EventFilter,
     caller: Caller,
-  ): Promise<{ events: TestbedEvent[]; cursor: string | null }> {
+  ): Promise<{ events: TestbedEvent[]; cursor: string | null; total: number }> {
     this.read(caller, 'queryEvents');
     const open = this.rt.runs.active();
-    let events: TestbedEvent[];
+    let page: { events: TestbedEvent[]; total: number };
     if (filter.runId !== undefined && filter.runId !== 'current' && filter.runId !== open?.runId) {
       const stored = await this.rt.store.events(filter.runId);
       const start =
         filter.after === undefined ? 0 : stored.findIndex((e) => e.id === filter.after) + 1;
-      events = stored
-        .slice(start)
-        .filter((event) => matchesFilter(event, filter))
-        .slice(0, queryLimit(filter));
+      const matching = stored.slice(start).filter((event) => matchesFilter(event, filter));
+      page = { events: matching.slice(0, queryLimit(filter)), total: matching.length };
     } else {
-      events = this.rt.bus.query(filter);
+      page = this.rt.bus.page(filter);
     }
-    return { events, cursor: events.at(-1)?.id ?? filter.after ?? null };
+    return { ...page, cursor: page.events.at(-1)?.id ?? filter.after ?? null };
   }
 
   getEvent(id: string, caller: Caller): TestbedEvent {
@@ -231,6 +231,26 @@ export class ControlService {
     if (!(await this.rt.store.get(runId))) throw new NotFoundError('run', runId);
     const events = await this.rt.store.events(runId);
     return events.map((event) => `${JSON.stringify(event)}\n`).join('');
+  }
+
+  /**
+   * Where to fetch a Run's export, without its body: the URL (under
+   * `TESTBED_PUBLIC_URL`) and, with the file store, the JSONL path. No
+   * `runId` → the open Run, else the Run that closed last.
+   */
+  async exportLocation(
+    runId: string | undefined,
+    caller: Caller,
+  ): Promise<{ runId: string; url: string; path?: string }> {
+    this.read(caller, 'exportLocation');
+    const id = runId ?? this.rt.runs.active()?.runId ?? (await this.lastClosedRun());
+    if (id === undefined || !(await this.rt.store.get(id))) {
+      throw new NotFoundError('run', runId ?? 'latest');
+    }
+    const url = new URL(`/testbed/api/runs/${encodeURIComponent(id)}/export`, this.info.publicUrl)
+      .href;
+    const path = this.rt.store.location(id);
+    return { runId: id, url, ...(path === undefined ? {} : { path }) };
   }
 
   // ── Operations ───────────────────────────────────────────────────────────
@@ -316,6 +336,12 @@ export class ControlService {
   }
 
   // ── Internals ────────────────────────────────────────────────────────────
+
+  private async lastClosedRun(): Promise<string | undefined> {
+    const closed = (await this.rt.store.list()).filter((meta) => meta.endedAt !== undefined);
+    closed.sort((a, b) => (b.endedAt ?? '').localeCompare(a.endedAt ?? ''));
+    return closed[0]?.runId;
+  }
 
   private read(caller: Caller, fn: string): void {
     this.lease.authorize(caller, fn, false);

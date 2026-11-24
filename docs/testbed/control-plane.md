@@ -18,6 +18,7 @@
 | `waitFor`                       | –               | 조건에 맞는 이벤트 대기                         |
 | `check`                         | –               | 판정                                            |
 | `exportRun`                     | –               | JSONL 내보내기                                  |
+| `exportLocation`                | –               | 내보내기 URL·파일 경로(MCP `export_run`)        |
 | `invokeAction`                  | 액션별          | 코어 액션([core-contract.md](core-contract.md)) |
 | `acquireLease` / `releaseLease` | –               | 제어 락                                         |
 
@@ -112,33 +113,57 @@
   - `POST /cores/:core/{start,stop,reset}` → `{ cores: CoreStatus[] }`
   - `POST /runs` → 201 `RunMeta`. `GET /runs` → `{ runs }`. `GET /runs/current`는 열린 Run입니다.
   - `POST /runs/current/end` → 닫힌 `RunMeta`(요약 포함). 열린 Run이 없으면 404 `NOT_FOUND`
-  - `GET /events` → `{ events, cursor }`. `cursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로)입니다. 닫힌 Run을 `runId`로 지정하면 Run 저장소에서 읽습니다.
-  - `POST /wait` `{ filter, count?, timeoutMs? }` → `{ events, timedOut }`. `after`가 없으면 부른 뒤부터 셉니다.
+  - `GET /events` → `{ events, cursor, total }`. `cursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로), `total`은 커서 뒤에서 필터에 맞는 이벤트 수(`limit`을 넘는 것 포함)입니다. 닫힌 Run을 `runId`로 지정하면 Run 저장소에서 읽습니다.
+  - `POST /wait` `{ filter, count?, timeoutMs? }` → `{ events, timedOut }`. `after`가 없으면 부른 뒤부터 셉니다. 이 경로는 `Bun.serve`의 유휴 타임아웃을 끄고 받습니다(최대 120초 대기).
   - `POST /lease` → `{ leaseId, expiresAt }`. `DELETE /lease` → `{ released }`
 - 오류 코드의 HTTP 상태는 `src/shared/testbed/errors.ts`의 `TESTBED_ERROR_STATUS`가 원본입니다. 없는 경로는 JSON 404입니다.
 - `start_run`의 `configOverrides`는 Run이 닫힐 때(교체 포함) Run 직전 설정으로 돌아갑니다. 하나라도 재시작이 필요하면 모두 되돌리고 `RESTART_REQUIRED`입니다.
 
 ## 4. MCP — `/testbed/mcp`
 
-- **전송**: Streamable HTTP. 공식 TypeScript SDK(`@modelcontextprotocol/sdk`)의 `WebStandardStreamableHTTPServerTransport`를 `Bun.serve` 라우트에 바로 붙입니다(웹 표준 `Request`/`Response`, Node `http` 흉내 없음). MCP 세션마다 전송 하나. 확인 결과는 `testbed-base`의 `docs/spec.md` 2절.
-- **세션**: `Mcp-Session-Id`가 락 보유자의 식별자입니다.
-- **initialize의 `instructions`**: "처음엔 `testbed_info` → `start_run` → 제품 작업 → `query_events`/`check` → `end_run`".
+- **전송**: Streamable HTTP. 공식 TypeScript SDK(`@modelcontextprotocol/sdk`)의 `WebStandardStreamableHTTPServerTransport`를 `Bun.serve` 라우트에 바로 붙입니다(웹 표준 `Request`/`Response`, Node `http` 흉내 없음). 응답은 기본 SSE 방식입니다. 확인 결과는 `testbed-base`의 `docs/spec.md` 2절. 구현은 `src/server/testbed/mcp/`(`endpoint.ts` 세션·인증, `tools.ts` 도구, `format.ts` 문장).
+- **세션**: MCP 세션마다 전송과 서버를 하나씩 만들고 `Mcp-Session-Id`로 고릅니다. 세션 없는 요청은 `initialize`만 받고(그 밖은 400), 끝난 세션의 요청은 404입니다.
+  - caller는 `{ actor: 'agent', sessionId: <Mcp-Session-Id>, name: <clientInfo.name> }`이고, `Mcp-Session-Id`가 락 보유자의 식별자입니다.
+  - 세션이 끝나는 경우: `DELETE`, 유휴 정리, 서버 종료. 어느 경우든 그 세션이 쥔 락도 풀립니다(`testbed.lease.released`, `reason: 'session-closed'`).
+  - 상한 `TESTBED_MCP_MAX_SESSIONS`(기본 32): 넘으면 새 `initialize`를 HTTP 503과 JSON-RPC 오류로 거절합니다. 문장: "MCP 세션이 상한(32)에 도달함. 쓰지 않는 세션을 닫거나(`DELETE`) 잠시 뒤 다시 시도".
+  - 유휴 정리 `TESTBED_MCP_SESSION_IDLE_SEC`(기본 3600): 그 시간 동안 요청이 없는 세션은 서버가 닫습니다. 실행 중인 도구 호출이 있는 동안에는 닫지 않습니다.
+  - MCP 요청은 `Bun.serve`의 유휴 타임아웃(10초)을 끄고 받습니다. `wait_for`가 최대 120초 동안 응답하지 않을 수 있기 때문입니다(REST `POST /wait`도 같음).
+- **인증**: `TESTBED_CONTROL_TOKEN`이 있으면 모든 MCP 요청에 `Authorization: Bearer <token>`이 필요합니다. 없거나 틀리면 401(JSON-RPC 오류, `WWW-Authenticate: Bearer`)입니다. 토큰이 없으면(로컬) 인증 없이 받습니다. MCP 호출자는 언제나 `agent`이고, `X-Testbed-Actor`는 보지 않습니다.
+- **initialize의 `instructions`** (그대로 씀):
+  > 테스트베드 제어면입니다. 처음엔 `testbed_info`로 코어·데이터면 주소·락 상태를 봅니다. 시험은 `start_run` → 제품 작업 → `query_events`/`wait_for`/`check` → `end_run` 순서로 합니다. 조작 도구는 첫 호출 때 제어 락을 잡고, 그동안 사람은 대시보드에서 조작할 수 없습니다. 끝나면 `release_control`을 부릅니다.
 
 ### 4.1 공통 도구
 
-| 도구                                  | 하는 일                                                                                                | 락     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------ |
-| `testbed_info`                        | 매니페스트 요약, 코어 상태, 데이터면 주소, 열린 Run, 락 보유자                                         | –      |
-| `get_config` / `set_config`           | 코어 설정 조회 / 부분 변경                                                                             | set만  |
-| `start` / `stop` / `reset`            | 코어 지정 또는 전체                                                                                    | ●      |
-| `start_run` / `end_run`               | Run 시작 / 종료 + 요약. `endActive: true`로 열린 Run을 닫고 시작                                       | ●      |
-| `query_events`                        | 필터(§1.2) → **summary 줄 목록 + 다음 커서**                                                           | –      |
-| `get_event`                           | 이벤트 하나의 전체 payload                                                                             | –      |
-| `wait_for`                            | 필터에 맞는 이벤트가 n건 올 때까지 대기. 기본 30초, 상한 120초. 시간이 지나면 지금까지의 결과를 돌려줌 | –      |
-| `check`                               | 판정([runs-and-checks.md](runs-and-checks.md))                                                         | –      |
-| `export_run`                          | 내보내기 파일의 URL·경로를 돌려줌(본문을 쏟아내지 않음)                                                | –      |
-| `acquire_control` / `release_control` | 제어 락                                                                                                | –      |
-| `<core>_<action>`                     | 코어 액션(자동 노출)                                                                                   | 액션별 |
+모든 도구는 제어 서비스 함수(§1)를 부르기만 합니다. 입력 검증기는 REST와 같은 것(`src/server/testbed/control/inputs.ts`)을 쓰고, 그 JSON Schema가 도구의 `inputSchema`입니다.
+
+| 도구                       | 입력                                                                                                   | `structuredContent`                                                                                          | 락     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------ |
+| `testbed_info`             | `{}`                                                                                                   | `{ name, version, instanceId, cores:[{id, kind, state, endpoints, actions:[name]}], run, lease }`            | –      |
+| `get_config`               | `{ core }`                                                                                             | 설정 객체                                                                                                    | –      |
+| `set_config`               | `{ core, patch }`                                                                                      | `{ result: 'applied' \| 'restart-required', config }`                                                        | ●      |
+| `start` / `stop` / `reset` | `{ core?: string }` (생략하면 `_all`)                                                                  | `{ cores: CoreStatus[] }`                                                                                    | ●      |
+| `start_run`                | `{ label, seed?, configOverrides?, endActive? }`                                                       | `RunMeta`                                                                                                    | ●      |
+| `end_run`                  | `{}`                                                                                                   | `RunMeta`(요약 포함)                                                                                         | ●      |
+| `query_events`             | 이벤트 필터 전체(`runId`, `core`, `kind`, `level`, `actor`, `correlationId`, `text`, `after`, `limit`) | `{ events: EventLine[], nextCursor, total }` — payload 없음                                                  | –      |
+| `get_event`                | `{ id }`                                                                                               | 이벤트 전체                                                                                                  | –      |
+| `wait_for`                 | `{ filter, count?: 1, timeoutMs?: 30000 }` (상한 120000)                                               | `{ matched, timedOut, events: EventLine[] }`                                                                 | –      |
+| `check`                    | `{ filter, expect, label? }`                                                                           | `{ pass, matched, sample: EventLine[] }`                                                                     | –      |
+| `export_run`               | `{ runId?: string }` (생략하면 열린 Run, 없으면 가장 최근에 닫힌 Run)                                  | `{ runId, url, path? }` — `url`은 `TESTBED_PUBLIC_URL` 기준 export 주소, `path`는 file 저장소일 때 파일 경로 | –      |
+| `acquire_control`          | `{}`                                                                                                   | `{ expiresAt }`                                                                                              | –      |
+| `release_control`          | `{}`                                                                                                   | `{ released }`                                                                                               | –      |
+| `<core>_<action>`          | 액션의 `input`                                                                                         | 액션의 출력(객체가 아니면 `{ result }`)                                                                      | 액션별 |
+
+- `EventLine`은 `{ id, ts, level, kind, summary, correlationId? }`입니다(`src/shared/testbed/events.ts`의 `toEventLine`).
+- `query_events`의 `total`은 커서 뒤에서 필터에 맞는 이벤트 수(`limit`을 넘는 것 포함)이고, `nextCursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로)입니다.
+- `wait_for`의 `timeoutMs`가 상한을 넘으면 검증 오류가 아니라 120000으로 잘립니다.
+- **액션 자동 노출**: `surfaces`에 `mcp`가 있는 액션마다 `<core>_<action>` 도구를 만듭니다. 코어 id의 `-`는 `_`로 바꿉니다. 설명은 액션의 `description`에 " (제어 락 필요)" 또는 " (읽기 전용)"을 덧붙이고, 입력 스키마는 액션 `input` 검증기의 JSON Schema입니다.
+- **도구 주석**: 읽기 도구(`testbed_info`, `get_config`, `query_events`, `get_event`, `wait_for`, `check`, `export_run`, `mutating: false` 액션)는 `annotations.readOnlyHint: true`, 나머지는 `false`입니다.
+- **결과 형식**
+  - 성공: `content`에 사람이 읽는 짧은 텍스트(여러 줄 가능), `structuredContent`에 기계용 객체.
+  - 실패: 제어 서비스가 던진 `TestbedError`, 검증 오류(`VALIDATION_ERROR`), 없는 대상(`NOT_FOUND`)은 JSON-RPC 오류가 아니라 도구 결과 `isError: true`입니다. `content`에는 오류 문장(다음 행동을 알려 주는 문장)을, `structuredContent`에는 `{ error: { code, message, details } }`를 담습니다. 예상하지 못한 예외만 JSON-RPC 내부 오류입니다. 없는 도구 이름은 JSON-RPC `InvalidParams`입니다.
+  - 입력 검증은 SDK가 아니라 제어 서비스 쪽 검증기가 하므로 실패도 같은 형식(`VALIDATION_ERROR`)입니다. 그래서 SDK의 저수준 `Server`에 `tools/list`·`tools/call` 처리기를 직접 답니다.
+- **이벤트 한 줄 형식**(`query_events`, `wait_for`, `check`의 `content`): `<id> <HH:MM:SS.mmm> <level> <kind> <summary>`. 시각은 UTC입니다.
+- `testbed_info`의 `content`는 이름·버전·instanceId 한 줄, 코어마다 한 줄(`sample running tcp://127.0.0.1:40001 actions: broadcast`), 열린 Run 한 줄, 락 보유자 한 줄입니다.
 
 ### 4.2 도구 설계 규칙
 

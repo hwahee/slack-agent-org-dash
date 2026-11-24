@@ -2,7 +2,13 @@
  * check — judges whether the events so far meet an expectation
  * (docs/testbed/runs-and-checks.md §2). Not an operation, so no lease.
  */
-import type { Caller, EventFilter, TestbedEvent } from '@shared/testbed/events';
+import {
+  toEventLine,
+  type Caller,
+  type EventFilter,
+  type EventLine,
+  type TestbedEvent,
+} from '@shared/testbed/events';
 import { s, toValidator } from '@shared/validation';
 
 import type { EventBus } from '../events/bus';
@@ -27,8 +33,8 @@ export interface CheckInput {
 export interface CheckResult {
   pass: boolean;
   matched: number;
-  /** Up to 10 matching events, as their id, kind and summary. */
-  sample: { id: string; kind: string; summary: string }[];
+  /** Up to 10 matching events, without payload. */
+  sample: EventLine[];
 }
 
 const expectationValidator = toValidator(
@@ -102,6 +108,6 @@ export async function runCheck(
   return {
     pass,
     matched: matching.length,
-    sample: matching.slice(0, SAMPLE_SIZE).map(({ id, kind, summary }) => ({ id, kind, summary })),
+    sample: matching.slice(0, SAMPLE_SIZE).map(toEventLine),
   };
 }

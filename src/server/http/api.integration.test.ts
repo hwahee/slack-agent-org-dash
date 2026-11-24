@@ -47,7 +47,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  plane.dispose();
+  await plane.dispose();
   await server.stop(true);
   await container.dispose();
   await issuer.stop();

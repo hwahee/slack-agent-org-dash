@@ -40,6 +40,16 @@ export function humanCaller(req: Request, auth: ControlAuth): Caller {
     : { actor: 'human' };
 }
 
+/**
+ * MCP: with `TESTBED_CONTROL_TOKEN` set, every request needs the Bearer token.
+ * Without one (local), anything goes; the caller is an agent either way.
+ */
+export function controlTokenOk(req: Request, auth: ControlAuth): boolean {
+  if (auth.controlToken === undefined) return true;
+  const bearer = /^Bearer (.+)$/i.exec(req.headers.get('authorization') ?? '')?.[1];
+  return bearer !== undefined && sameToken(bearer, auth.controlToken);
+}
+
 export function resolveCaller(req: Request, auth: ControlAuth): Caller {
   const claimed = req.headers.get(ACTOR_HEADER)?.toLowerCase();
   const leaseId = req.headers.get(LEASE_HEADER) ?? undefined;

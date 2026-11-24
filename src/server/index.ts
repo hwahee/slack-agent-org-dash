@@ -49,7 +49,7 @@ for (const core of testbed.host.statusAll()) {
 }
 const controlPlane = createControlPlane(testbed, { config: testbedConfig, server: config });
 stopHooks.push(async () => {
-  controlPlane.dispose();
+  await controlPlane.dispose();
   await testbed.host.stopAll();
 });
 

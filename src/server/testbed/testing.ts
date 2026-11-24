@@ -4,7 +4,9 @@
  */
 import type { TestbedEvent } from '@shared/testbed/events';
 
-import type { ServerConfig } from '../config';
+import { buildApp } from '../app';
+import { loadServerConfig, type ServerConfig } from '../config';
+import { createContainer } from '../container';
 import { silentLogger } from '../lib/log';
 import { loadTestbedConfig } from './config';
 import type { CoreDefinition } from './core';
@@ -35,6 +37,36 @@ export async function createTestControlPlane(
     server: options.server ?? { authDriver: 'none' },
   });
   return { runtime, plane };
+}
+
+/**
+ * The whole app (REST, WS, MCP) as the server builds it, on an ephemeral
+ * port, with the cores auto-started. `stop` tears everything down.
+ */
+export async function startTestServer(
+  options: {
+    cores?: readonly CoreDefinition[];
+    env?: Record<string, string>;
+    /** `Bun.serve`'s idle timeout in seconds (default 10). */
+    idleTimeout?: number;
+  } = {},
+) {
+  const { runtime, plane } = await createTestControlPlane(options);
+  await runtime.host.startAutoStart();
+  const container = createContainer(loadServerConfig({}), { log: silentLogger });
+  const server = Bun.serve({
+    port: 0,
+    ...(options.idleTimeout === undefined ? {} : { idleTimeout: options.idleTimeout }),
+    ...buildApp(container, { shuttingDown: false }, plane),
+  });
+  const base = String(server.url).replace(/\/$/, '');
+  async function stop() {
+    await plane.dispose();
+    await runtime.host.stopAll();
+    await server.stop(true);
+    await container.dispose();
+  }
+  return { base, server, runtime, plane, stop };
 }
 
 /** Resolves with the first event (already buffered or still to come) that matches. */

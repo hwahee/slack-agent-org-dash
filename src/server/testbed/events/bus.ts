@@ -99,18 +99,24 @@ export class EventBus {
    * another boot throws `CURSOR_STALE`.
    */
   query(filter: EventFilter): TestbedEvent[] {
+    return this.page(filter).events;
+  }
+
+  /** {@link query}, plus how many events match in all (past `limit` too). */
+  page(filter: EventFilter): { events: TestbedEvent[]; total: number } {
     const afterSeq = filter.after === undefined ? -1 : cursorSeq(filter.after, this.instanceId);
     const runId = filter.runId === 'current' ? this.currentRunId : filter.runId;
-    if (filter.runId !== undefined && runId === null) return [];
-    const out: TestbedEvent[] = [];
+    if (filter.runId !== undefined && runId === null) return { events: [], total: 0 };
+    const events: TestbedEvent[] = [];
     const limit = queryLimit(filter);
+    let total = 0;
     for (const event of this.buffer.toArray()) {
       if (event.seq <= afterSeq) continue;
       if (filter.runId !== undefined && event.runId !== runId) continue;
       if (!matchesFilter(event, filter)) continue;
-      out.push(event);
-      if (out.length >= limit) break;
+      total += 1;
+      if (events.length < limit) events.push(event);
     }
-    return out;
+    return { events, total };
   }
 }

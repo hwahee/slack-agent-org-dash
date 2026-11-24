@@ -15,11 +15,14 @@ FROM oven/bun:1.4.2-slim AS runtime
 WORKDIR /app
 ENV APP_ENV=production
 ENV PORT=40000
+# Data and control planes listen on every interface inside the container.
+ENV TESTBED_BIND_HOST=0.0.0.0
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/migrations ./migrations
 
-EXPOSE 40000
+# 40000: dashboard + control plane, 40001: sample core (TCP echo)
+EXPOSE 40000 40001
 
 # The bundled client assets are resolved relative to the working directory.
 WORKDIR /app/dist

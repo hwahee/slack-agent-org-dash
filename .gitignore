@@ -18,3 +18,6 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Testbed Run store (TESTBED_RUN_STORE=file, TESTBED_DATA_DIR)
+data/

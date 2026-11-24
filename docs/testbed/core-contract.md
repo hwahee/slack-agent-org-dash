@@ -4,36 +4,45 @@
 
 ## 1. 정의
 
-아래는 개념 정의입니다. 정확한 이름과 파일 위치는 `testbed-base` 구현(P1)에서 확정하고, 확정되면 이 문서를 고칩니다.
+정의는 `src/server/testbed/core.ts`에 있고, 상태·엔드포인트처럼 대시보드도 보는 타입은 `src/shared/testbed/core.ts`에 있습니다. 코어 호스트는 `src/server/testbed/core-host.ts`, 이 테스트베드의 코어 목록은 `src/server/testbed/cores/index.ts`(`CORES`)입니다.
 
 ```ts
-// src/shared/testbed/core.ts
-interface CoreDefinition<C> {
+// 모든 코어 설정이 갖는 공통 필드 — 호스트가 읽음
+interface BaseCoreConfig {
+  autoStart: boolean; // 부팅 때 시작. passive 기본 true, active·scenario 기본 false
+  eventLevel: 'debug' | 'info'; // info면 그 코어의 debug 이벤트를 버림
+  faults: FaultRule[]; // faultRuleSchema(@shared/testbed/faults)로 검증
+}
+
+interface CoreDefinition<C extends BaseCoreConfig, I extends CoreInstance> {
   id: string; // 'echo', 'llm' — 이벤트 kind 접두사, env 접두사, MCP 도구 접두사로 쓰임
   kind: 'passive' | 'active' | 'scenario';
   title: string;
   configSchema: Validator<C>; // @shared/validation 파사드. 매니페스트에는 JSON Schema로 노출
-  defaultConfig: (env: Env) => C; // env는 기본값만 줌. 런타임 변경은 제어 API로
-  actions?: Record<string, ActionDefinition>; // 고유 동작 (§4)
-  faults?: FaultCapability; // 지원하는 결함 종류 (faults-and-seed.md)
-  create(ctx: CoreContext<C>): CoreInstance<C>;
+  defaultConfig(env): unknown; // env는 기본값만 줌. 호스트가 configSchema로 검증(잘못된 env는 부팅 실패)
+  actions?: Record<string, ActionDefinition<I>>; // 고유 동작 (§4)
+  faults?: FaultKind[]; // 지원하는 결함 종류. 다른 종류를 쓰는 규칙은 설정 검증에서 거절
+  create(ctx: CoreContext<C>): I;
 }
 
 interface CoreContext<C> {
-  emit(e: CoreEventInput): void; // 봉투의 공통 필드(seq, id, ts, runId, core, actor 기본값)는 런타임이 채움
+  emit(e: CoreEventInput): void; // core·actor(기본 'product')와 봉투의 공통 필드는 런타임이 채움. kind는 '<id>.'로 시작해야 함
   log: Logger;
-  rng: SeededRng; // 모든 무작위는 이것으로
-  run(): RunHandle | null; // 열린 Run, 없으면 null
-  faults: FaultDecider; // 결함 판정 도우미
+  rng: SeededRng; // 모든 무작위는 이것으로. 열린 Run의 seed, 없으면 부팅 seed
+  run(): RunMeta | null; // 열린 Run, 없으면 null
+  faults: FaultDecider; // 결함 판정 도우미. 적용하면 testbed.fault.injected가 남음
   signal: AbortSignal; // stop/shutdown 때 abort
+  config(): C; // 지금 설정. 쓰는 자리에서 읽어야 런타임 변경이 바로 적용됨
+  bindHost: string; // TESTBED_BIND_HOST
+  publicHost: string; // TESTBED_PUBLIC_URL의 호스트 — endpoints의 url에 씀
 }
 
-interface CoreInstance<C> {
-  start(): Promise<void>;
+interface CoreInstance {
+  start(): Promise<void>; // 던지면 error 상태. 오류의 code(예: EADDRINUSE)가 detail이 됨
   stop(): Promise<void>;
-  reset?(): Promise<void>; // 내부 상태·카운터 초기화. 포트는 유지
-  applyConfig(next: C): Promise<'applied' | 'restart-required'>;
-  status(): CoreStatus; // state, endpoints, counters, 코어별 요약
+  reset?(): Promise<void>; // 내부 상태·카운터 초기화. 포트는 유지. 결함 times는 호스트가 초기화
+  applyConfig(next: C): Promise<'applied' | 'restart-required'>; // running일 때만 불림. 설정은 이미 저장됨
+  status(): { endpoints; counters }; // id·kind·title·state·detail은 호스트가 붙임(CoreStatus)
 }
 ```
 
@@ -53,24 +62,26 @@ idle → starting → running → stopping → stopped
   └──────────── 어느 상태에서든 → error
 ```
 
-- 상태가 바뀔 때마다 `testbed.core.state` 이벤트가 나갑니다(`actor: 'system'`).
+- 상태가 바뀔 때마다 `testbed.core.state` 이벤트가 나갑니다(`actor: 'system'`, payload `{ core, from, to, detail? }`).
 - `error`에서는 `start`로 다시 시작할 수 있습니다. `error`로 갈 때 이벤트의 `level`은 `error`이고, `payload.detail`에 원인을 담습니다.
 - `status().endpoints`는 데이터면 주소 목록(`{ name, protocol, url }`)입니다. 매니페스트, 대시보드 연결 패널, MCP `testbed_info`에 그대로 나타납니다. `url`은 `TESTBED_PUBLIC_URL`의 호스트를 씁니다.
 - 부팅 시 자동 시작 여부는 코어 설정 `autoStart`로 정합니다. passive는 기본 `true`, active·scenario는 기본 `false`입니다.
-- `applyConfig`가 `restart-required`를 돌려주면 설정은 저장되지만 적용되지 않습니다. 제어 서비스가 `RESTART_REQUIRED`로 알리고, 다음 `stop` → `start` 때 적용됩니다.
+- `applyConfig`가 `restart-required`를 돌려주면 설정은 저장되지만 적용되지 않습니다. 제어 서비스가 `RESTART_REQUIRED`로 알리고, 다음 `stop` → `start` 때 적용됩니다. 코어가 running이 아니면 `applyConfig`를 부르지 않고 저장만 합니다(`applied`).
+- 액션은 코어가 `running`일 때만 실행됩니다. 아니면 `CORE_NOT_RUNNING`입니다. 입력과 출력은 액션의 `input`·`output` 검증기를 거칩니다.
 
 ## 4. 액션
 
 공통 동작(start, stop, config 등)으로 표현되지 않는 기능은 액션으로 등록합니다.
 
 ```ts
-interface ActionDefinition {
+interface ActionDefinition<I extends CoreInstance> {
   title: string;
   description: string; // 에이전트가 읽는 설명 — 부작용, 단위, 상한, 락 필요 여부를 적음
   input: Validator<unknown>;
   output: Validator<unknown>;
   mutating: boolean; // true면 제어 락이 필요함
   surfaces?: ('rest' | 'mcp' | 'ui')[]; // 기본: 셋 다
+  run(instance: I, input: unknown, caller: Caller): Promise<unknown>; // 검증된 입력으로 불림
 }
 ```
 

@@ -21,6 +21,8 @@ import prettierConfig from 'eslint-config-prettier';
  * 4. Overlay internals are closed, and the declarative overlay components are
  *    opt-in: importing them fails until the caller disables the rule and says
  *    why (docs/overlay-design.md §5.1).
+ * 5. Testbed cores draw every random number from `ctx.rng` so a seed replays
+ *    them (docs/testbed/faults-and-seed.md §2): no `Math.random()` there.
  */
 export default tseslint.config(
   {
@@ -143,6 +145,21 @@ export default tseslint.config(
                 'Import from @shared/validation instead. zod is an implementation detail behind the validation facade.',
             },
           ],
+        },
+      ],
+    },
+  },
+  // Reproducibility: cores use the seeded ctx.rng, never Math.random.
+  {
+    files: ['src/server/testbed/cores/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message:
+            'Use ctx.rng: every random behaviour of a core must replay from its seed (docs/testbed/faults-and-seed.md §2).',
         },
       ],
     },

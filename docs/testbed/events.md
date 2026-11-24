@@ -61,8 +61,20 @@ interface TestbedEvent<P = unknown> {
 
 ## 4. 크기와 비밀값
 
-- **크기 상한**: payload는 기본 16KB(`TESTBED_MAX_PAYLOAD_BYTES`)입니다. 넘으면 앞부분만 담고 `truncated: true`를 붙입니다. 큰 본문이 꼭 필요한 코어는 본문 대신 sha256과 길이를 함께 담습니다.
+- **크기 상한**: payload는 기본 16KB(`TESTBED_MAX_PAYLOAD_BYTES`)입니다. 넘으면 payload를 `{ preview, bytes }`로 바꾸고 `truncated: true`를 붙입니다. `preview`는 원래 payload JSON의 앞부분(글자 경계에서 잘라 전체가 상한 안에 들어감), `bytes`는 원래 크기입니다. 큰 본문이 꼭 필요한 코어는 본문 대신 sha256과 길이를 함께 담습니다.
 - **비밀값 가림**: `Authorization`, `Cookie`, `Set-Cookie`, 이름이 `-key`로 끝나거나 `token`·`secret`·`password`를 포함하는 헤더·필드는 공통 유틸로 가립니다.
   - 가린 값의 형식: `앞 4자…(길이 n, sha256:앞 12자)`. 예: `sk-a…(len 51, sha256:3f9a0c1d22be)`
   - 원문은 링버퍼, Run 저장소, 로그 어디에도 남기지 않습니다.
   - 가림 대상을 늘려야 하는 코어는 공통 유틸에 키를 추가해서 넘깁니다. 직접 가리지 않습니다.
+  - 가림과 크기 상한은 이벤트 버스가 `emit` 때 적용합니다. 코어는 추가 키를 `redactKeys`로 넘깁니다.
+
+## 5. 코드 위치
+
+| 무엇                                        | 위치                                               |
+| ------------------------------------------- | -------------------------------------------------- |
+| 봉투·필터·`Caller` 타입                     | `src/shared/testbed/events.ts`                     |
+| Run 메타·요약 타입                          | `src/shared/testbed/runs.ts`                       |
+| 이벤트 버스, 링버퍼, 필터·커서              | `src/server/testbed/events/`                       |
+| Run 관리(`RunManager`), 저장소, 요약, check | `src/server/testbed/runs/`                         |
+| 가림(`redact`), 크기 상한(`limitPayload`)   | `src/server/testbed/redact.ts`, `payload-limit.ts` |
+| `CURSOR_STALE`·`RUN_ACTIVE`(`TestbedError`) | `src/server/testbed/errors.ts`                     |

@@ -1,0 +1,65 @@
+/**
+ * The common event envelope and the filter every event query shares
+ * (docs/testbed/events.md §2, docs/testbed/control-plane.md §1.2).
+ *
+ * Shared because the dashboard reads the same envelopes over WS.
+ */
+import type { UtcIsoString } from '@shared/time';
+
+export const EVENT_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
+export type EventLevel = (typeof EVENT_LEVELS)[number];
+
+export type Actor = 'product' | 'human' | 'agent' | 'ci' | 'system';
+
+/** Who called a control-service function (docs/testbed/control-plane.md §1.1). */
+export interface Caller {
+  actor: Actor;
+  /** MCP session id (`Mcp-Session-Id`). */
+  sessionId?: string;
+  /** Lease id taken over REST. */
+  leaseId?: string;
+  /** Display name, e.g. MCP `clientInfo.name`. */
+  name?: string;
+}
+
+export interface TestbedEvent<P = unknown> {
+  /** Monotonic within one boot; starts at 0 every boot. */
+  seq: number;
+  /** `${instanceId}:${seq}` — doubles as the cursor. */
+  id: string;
+  ts: UtcIsoString;
+  /** `null` outside a Run. */
+  runId: string | null;
+  /** Core id; the common runtime itself is `testbed`. */
+  core: string;
+  replica?: string;
+  /** `<core>.<target>.<verb>`, verb in the past tense. */
+  kind: string;
+  level: EventLevel;
+  actor: Actor;
+  correlationId?: string;
+  latencyMs?: number;
+  /** One line, at most 200 characters. Required. */
+  summary: string;
+  payload: P;
+  /** The payload was over the size cap; see `limitPayload`. */
+  truncated?: boolean;
+}
+
+export interface EventFilter {
+  /** A Run id, or `'current'` for the open Run. */
+  runId?: string;
+  core?: string;
+  /** Kind prefix: `llm.completion` matches everything under it. */
+  kind?: string;
+  /** This level or above. */
+  level?: EventLevel;
+  actor?: Actor;
+  correlationId?: string;
+  /** Substring of `summary`. */
+  text?: string;
+  /** Cursor `<instanceId>:<seq>`: only events after it. */
+  after?: string;
+  /** Default 50, at most 500. */
+  limit?: number;
+}

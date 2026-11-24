@@ -235,6 +235,15 @@ export class CoreHost {
     };
   }
 
+  /** The registered definitions, in registration order (for the manifest). */
+  definitions(): CoreDefinition[] {
+    return [...this.cores.values()].map((core) => core.definition);
+  }
+
+  ids(): string[] {
+    return [...this.cores.keys()];
+  }
+
   statusAll(): CoreStatus[] {
     return [...this.cores.keys()].map((id) => this.status(id));
   }

@@ -15,6 +15,8 @@ import { loadServerConfig, type ServerConfig } from '../config';
 import { createContainer, type Container } from '../container';
 import { silentLogger } from '../lib/log';
 import type { AppState } from '../routes/health';
+import type { TestbedSocketData } from '../testbed/http/routes';
+import { createTestControlPlane } from '../testbed/testing';
 
 const ALLOWED_ORIGIN = 'https://allowed.example.com';
 
@@ -23,12 +25,14 @@ const issuer = startFakeIssuer();
 let config: ServerConfig;
 let container: Container;
 let state: AppState;
-let server: Bun.Server<undefined>;
+let server: Bun.Server<TestbedSocketData>;
+let plane: Awaited<ReturnType<typeof createTestControlPlane>>['plane'];
 let baseUrl: string;
 /** Session cookie of a signed-in member — `/api/auth/me` answers 200 with it. */
 let memberCookie: string;
 
-beforeAll(() => {
+beforeAll(async () => {
+  ({ plane } = await createTestControlPlane());
   config = issuer.config({
     APP_ENV: 'local',
     PUBSUB_DRIVER: 'memory',
@@ -36,13 +40,14 @@ beforeAll(() => {
   });
   container = createContainer(config, { log: silentLogger });
   state = { shuttingDown: false };
-  const app = buildApp(container, state);
+  const app = buildApp(container, state, plane);
   server = Bun.serve({ port: 0, ...app });
   baseUrl = String(server.url).replace(/\/$/, '');
   memberCookie = signedInCookie(config, { userId: 'tester', displayName: 'Tester' });
 });
 
 afterAll(async () => {
+  plane.dispose();
   await server.stop(true);
   await container.dispose();
   await issuer.stop();
@@ -349,7 +354,7 @@ describe('auth (AUTH_DRIVER=oidc)', () => {
 
   test('with AUTH_DRIVER=none the auth routes are not mounted', () => {
     const none = loadServerConfig({ DB_DRIVER: 'memory', AUTH_DRIVER: 'none' });
-    const app = buildApp(createContainer(none, { log: silentLogger }), state);
+    const app = buildApp(createContainer(none, { log: silentLogger }), state, plane);
     expect(Object.keys(app.routes).filter((path) => path.startsWith('/api/auth'))).toEqual([]);
   });
 });

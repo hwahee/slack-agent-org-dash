@@ -14,6 +14,7 @@ describe('loadTestbedConfig', () => {
       dataDir: './data',
       runRetention: 50,
       maxPayloadBytes: 16_384,
+      leaseTtlSec: 600,
     });
   });
 

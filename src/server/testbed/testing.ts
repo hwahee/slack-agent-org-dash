@@ -4,7 +4,38 @@
  */
 import type { TestbedEvent } from '@shared/testbed/events';
 
+import type { ServerConfig } from '../config';
+import { silentLogger } from '../lib/log';
+import { loadTestbedConfig } from './config';
+import type { CoreDefinition } from './core';
 import type { EventBus } from './events/bus';
+import { createControlPlane, createTestbedRuntime } from './runtime';
+
+/**
+ * A runtime and control plane as the server builds them, with every port at 0
+ * unless `env` says otherwise. Stop the cores and `dispose` when done.
+ */
+export async function createTestControlPlane(
+  options: {
+    cores?: readonly CoreDefinition[];
+    env?: Record<string, string>;
+    server?: Pick<ServerConfig, 'authDriver' | 'oidc'>;
+  } = {},
+) {
+  const env = { SAMPLE_PORT: '0', ...options.env };
+  const config = loadTestbedConfig(env, 0);
+  const runtime = await createTestbedRuntime({
+    config,
+    env,
+    log: silentLogger,
+    cores: options.cores ?? [],
+  });
+  const plane = createControlPlane(runtime, {
+    config,
+    server: options.server ?? { authDriver: 'none' },
+  });
+  return { runtime, plane };
+}
 
 /** Resolves with the first event (already buffered or still to come) that matches. */
 export function waitForEvent(

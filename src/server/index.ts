@@ -16,7 +16,7 @@ import { createContainer } from './container';
 import type { AppState } from './routes/health';
 import { loadTestbedConfig } from './testbed/config';
 import { CORES } from './testbed/cores';
-import { createTestbedRuntime } from './testbed/runtime';
+import { createControlPlane, createTestbedRuntime } from './testbed/runtime';
 
 // Policy: the server process itself lives in UTC; time-zone conversion only
 // happens at the client boundary (@shared/time).
@@ -31,8 +31,9 @@ const stopHooks: (() => Promise<void>)[] = [];
 
 // ── Testbed ─────────────────────────────────────────────────────────────────
 // Cores open their data-plane ports here; shutdown stops them all.
+const testbedConfig = loadTestbedConfig(process.env, config.port);
 const testbed = await createTestbedRuntime({
-  config: loadTestbedConfig(process.env, config.port),
+  config: testbedConfig,
   env: process.env,
   log: container.log,
   cores: CORES,
@@ -46,11 +47,15 @@ for (const core of testbed.host.statusAll()) {
     endpoints: core.endpoints.map((endpoint) => endpoint.url),
   });
 }
-stopHooks.push(() => testbed.host.stopAll());
+const controlPlane = createControlPlane(testbed, { config: testbedConfig, server: config });
+stopHooks.push(async () => {
+  controlPlane.dispose();
+  await testbed.host.stopAll();
+});
 
 // ── Web role ────────────────────────────────────────────────────────────────
 if (config.serverRole === 'web' || config.serverRole === 'all') {
-  const app = buildApp(container, state);
+  const app = buildApp(container, state, controlPlane);
 
   const server = Bun.serve({
     port: config.port,
@@ -65,6 +70,7 @@ if (config.serverRole === 'web' || config.serverRole === 'all') {
       // Unknown /api/* paths never reach it — see routes/api-fallback.ts.
       '/*': homepage,
     },
+    websocket: app.websocket,
   });
 
   stopHooks.push(async () => {

@@ -69,6 +69,12 @@
 - 거절될 때마다 `testbed.lease.denied` 이벤트가 남습니다.
 - 사람은 락을 잡지 않습니다. 락이 없을 때 사람은 자유롭게 조작하고, 에이전트가 조작을 시작하면 그때부터 잠깁니다.
 - 락은 유예 없이 즉시 걸립니다. 사람이 편집하던 입력의 처리는 [dashboard.md](dashboard.md)를 따릅니다.
+- 이벤트와 Run 메타에는 caller의 세션 id·lease id를 **앞 4자만** 남깁니다. 이벤트와 Run은 누구나 읽으므로, 전체 id를 남기면 그것으로 보유자 행세를 할 수 있기 때문입니다.
+
+### 2.4 강제 해제 — `bun run testbed:release`
+
+- 실행 중인 인스턴스의 로컬 전용 경로 `POST /testbed/internal/release`를 `127.0.0.1:$PORT`로 부릅니다. 루프백이 아닌 주소에서 오거나 `X-Forwarded-For`가 붙은 요청은 404로 거절합니다.
+- 해제는 `testbed.lease.released`(`actor: 'system'`, `payload.reason: 'forced'`)로 남습니다. 다른 해제 사유는 `released`(보유자가 해제), `session-closed`(MCP 세션 종료)입니다.
 
 ## 3. REST — `/testbed/api`
 
@@ -99,6 +105,18 @@
   | `CORE_NOT_RUNNING` | 409  | 코어가 `running`이 아님                                                                                                                                       |
   | `RESTART_REQUIRED` | 409  | `start_run`의 `configOverrides`처럼 즉시 적용돼야 하는 설정이 재시작을 요구함. `PATCH /config`는 오류가 아니라 200 응답의 `result: 'restart-required'`로 알림 |
   | `CURSOR_STALE`     | 410  | 다른 인스턴스의 커서                                                                                                                                          |
+
+- 응답 모양
+  - `GET /status` → `{ instanceId, cores: CoreStatus[], run: RunMeta | null, lease: LeaseView | null }`
+  - `PATCH /cores/:core/config` → `{ result: 'applied' | 'restart-required', config }`
+  - `POST /cores/:core/{start,stop,reset}` → `{ cores: CoreStatus[] }`
+  - `POST /runs` → 201 `RunMeta`. `GET /runs` → `{ runs }`. `GET /runs/current`는 열린 Run입니다.
+  - `POST /runs/current/end` → 닫힌 `RunMeta`(요약 포함). 열린 Run이 없으면 404 `NOT_FOUND`
+  - `GET /events` → `{ events, cursor }`. `cursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로)입니다. 닫힌 Run을 `runId`로 지정하면 Run 저장소에서 읽습니다.
+  - `POST /wait` `{ filter, count?, timeoutMs? }` → `{ events, timedOut }`. `after`가 없으면 부른 뒤부터 셉니다.
+  - `POST /lease` → `{ leaseId, expiresAt }`. `DELETE /lease` → `{ released }`
+- 오류 코드의 HTTP 상태는 `src/shared/testbed/errors.ts`의 `TESTBED_ERROR_STATUS`가 원본입니다. 없는 경로는 JSON 404입니다.
+- `start_run`의 `configOverrides`는 Run이 닫힐 때(교체 포함) Run 직전 설정으로 돌아갑니다. 하나라도 재시작이 필요하면 모두 되돌리고 `RESTART_REQUIRED`입니다.
 
 ## 4. MCP — `/testbed/mcp`
 
@@ -135,6 +153,13 @@
 
 - 대시보드 전용입니다. 연결하면 `snapshot`(상태 + 최근 이벤트)을 받고, 이후 `event`, `status`, `lease` 증분을 받습니다.
 - 조작은 WS로 보내지 않습니다. 대시보드의 조작은 REST로 합니다.
+- 메시지(`TestbedSocketMessage`, `src/server/testbed/http/ws.ts`)
+  - `{ type: 'snapshot', status, events }` — 연결 직후 한 번. `events`는 링버퍼의 최근 200건
+  - `{ type: 'event', events, omitted }` — 100ms마다 묶어 보냄
+  - `{ type: 'status', status }` — 코어 상태 변화, Run 시작·종료 때
+  - `{ type: 'lease', lease }` — 락 획득·해제·만료 때
+- 표본화: 1초 안에 200건을 넘으면 그 뒤로는 10건 중 1건만 보내고, 나머지 건수를 `omitted`에 담습니다. 링버퍼와 Run 저장소에는 모두 남습니다.
+- `AUTH_DRIVER=oidc`면 로그인한 사람만 연결할 수 있습니다.
 
 ## 6. 매니페스트 — `GET /testbed/api/manifest`
 
@@ -163,6 +188,9 @@
 }
 ```
 
+- `version`은 빌드의 git SHA, `baseVersion`은 이 테스트베드가 머지한 `testbed-base`의 공통 런타임 버전(`src/server/testbed/version.ts`)입니다.
+- `configSchema`와 액션의 `inputSchema`는 검증기에서 만든 JSON Schema입니다(`toJsonSchema`, `@shared/validation`).
+
 ## 7. 인증
 
 | 대상                          | 로컬               | 공용 서버·클라우드                                                            |
@@ -176,3 +204,21 @@
   - MCP: `agent`
   - CI 토큰으로 온 REST: `ci`
   - 로컬에서 인증이 없을 때는 자기 신고(`X-Testbed-Actor`)입니다. 헤더가 없으면 `human`으로 봅니다. 개발 도구이므로 허용합니다.
+- `TESTBED_CONTROL_TOKEN`을 설정하면 `Authorization: Bearer <token>`이 맞는 호출만 에이전트·CI로 받고(`X-Testbed-Actor`가 `agent`면 agent, 아니면 ci), Bearer 없이 `agent`·`ci`를 자처하면 401 `UNAUTHORIZED`입니다. Bearer 없는 호출은 `human`이며, `AUTH_DRIVER=oidc`면 로그인한 사람이어야 합니다.
+- REST의 lease id는 `X-Testbed-Lease` 헤더로 보냅니다.
+
+## 8. 코드 위치
+
+| 무엇                               | 위치                                       |
+| ---------------------------------- | ------------------------------------------ |
+| 제어 서비스                        | `src/server/testbed/control/service.ts`    |
+| 제어 락(REST lease, MCP 세션 함수) | `src/server/testbed/control/lease.ts`      |
+| caller 판별·토큰                   | `src/server/testbed/http/auth.ts`          |
+| REST 어댑터                        | `src/server/testbed/http/rest.ts`          |
+| WS 어댑터                          | `src/server/testbed/http/ws.ts`            |
+| 강제 해제 경로·라우트 묶음         | `src/server/testbed/http/routes.ts`        |
+| 조립(부팅)                         | `src/server/testbed/runtime.ts`            |
+| `bun run testbed:release`          | `scripts/testbed-release.ts`               |
+| 오류 코드·HTTP 상태, `LeaseView`   | `src/shared/testbed/errors.ts`, `lease.ts` |
+
+- P2의 MCP 어댑터는 `LeaseManager.authorize`에 `sessionId`가 든 caller를 넘겨 첫 조작 때 자동 획득·호출마다 연장을 받고, 세션이 끝나면 `releaseSession(sessionId)`을 부릅니다.

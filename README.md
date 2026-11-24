@@ -45,6 +45,15 @@ bun run dev        # http://localhost:40000
 | `bun run build` | 프로덕션 빌드 → `dist/` (서버가 클라이언트를 포함하는 단일 산출물) |
 | `bun run start` | 빌드 산출물 실행                                                   |
 
+제어면(REST)으로 조작하고 관찰합니다. 자세한 규약은 [docs/testbed/control-plane.md](docs/testbed/control-plane.md)에 있습니다.
+
+```bash
+curl -s localhost:40000/testbed/api/manifest                     # 코어, 데이터면 주소, 제어면 경로
+curl -s -X POST -H 'X-Testbed-Actor: ci' localhost:40000/testbed/api/lease   # → { leaseId }
+curl -s 'localhost:40000/testbed/api/events?kind=sample.data&limit=20'
+bun run testbed:release                                           # 비상시: 제어 락 강제 해제(이 머신에서만)
+```
+
 Docker 이미지:
 
 ```bash

@@ -47,9 +47,12 @@ function toIssues(issues: readonly ZodLikeIssue[]): ValidationIssue[] {
   }));
 }
 
+/** The schema behind each validator, for {@link toJsonSchema}. */
+const schemas = new WeakMap<Validator<unknown>, ZodLikeSchema<unknown>>();
+
 /** Wraps a zod schema into the library-agnostic {@link Validator} contract. */
 export function toValidator<T>(schema: ZodLikeSchema<T>): Validator<T> {
-  return {
+  const validator: Validator<T> = {
     parse(input: unknown): T {
       const result = schema.safeParse(input);
       if (!result.success) throw new ValidationError(toIssues(result.error.issues));
@@ -62,4 +65,20 @@ export function toValidator<T>(schema: ZodLikeSchema<T>): Validator<T> {
         : { ok: false, issues: toIssues(result.error.issues) };
     },
   };
+  schemas.set(validator, schema);
+  return validator;
+}
+
+/**
+ * JSON Schema of what a validator accepts — for documents that describe an
+ * input to other programs (e.g. a testbed manifest). `{}` for a validator not
+ * made by {@link toValidator}.
+ */
+export function toJsonSchema(validator: Validator<unknown>): Record<string, unknown> {
+  const schema = schemas.get(validator);
+  if (!schema) return {};
+  return z.toJSONSchema(schema as unknown as Parameters<typeof z.toJSONSchema>[0], {
+    io: 'input',
+    unrepresentable: 'any',
+  });
 }

@@ -10,8 +10,13 @@ import { apiFallbackRoutes } from './routes/api-fallback';
 import { authRoutes } from './routes/auth';
 import { livenessRoute, readinessRoute, type AppState } from './routes/health';
 import { sitemapRoute } from './routes/sitemap';
+import { testbedRoutes, type TestbedHttp, type TestbedSocketData } from './testbed/http/routes';
 
-export function buildApp(container: Container, state: AppState) {
+/** What each socket carries — only testbed dashboard sockets for now. */
+export type SocketData = TestbedSocketData;
+
+/** `testbed` is the control plane mounted under `/testbed/*`. */
+export function buildApp(container: Container, state: AppState, testbed: TestbedHttp) {
   const deps: HttpDeps = { config: container.config, log: container.log };
 
   return {
@@ -27,6 +32,19 @@ export function buildApp(container: Container, state: AppState) {
        * part of the application API.
        */
       '/sitemap.json': sitemapRoute(deps),
+      ...testbedRoutes(testbed, deps),
+    },
+
+    websocket: {
+      open(ws: Bun.ServerWebSocket<SocketData>) {
+        testbed.hub.open(ws);
+      },
+      message() {
+        // The dashboard operates over REST; nothing is accepted over WS.
+      },
+      close(ws: Bun.ServerWebSocket<SocketData>) {
+        testbed.hub.close(ws);
+      },
     },
 
     /** Fallback for anything no route matched (API-only mode, e.g. tests). */

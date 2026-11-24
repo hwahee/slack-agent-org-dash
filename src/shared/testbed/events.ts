@@ -5,6 +5,7 @@
  * Shared because the dashboard reads the same envelopes over WS.
  */
 import type { UtcIsoString } from '@shared/time';
+import { s, toValidator } from '@shared/validation';
 
 export const EVENT_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type EventLevel = (typeof EVENT_LEVELS)[number];
@@ -63,3 +64,18 @@ export interface EventFilter {
   /** Default 50, at most 500. */
   limit?: number;
 }
+
+/** Validates a filter from a request (JSON body, or query string values coerced by the caller). */
+export const eventFilterValidator = toValidator(
+  s.object({
+    runId: s.optional(s.string().check(s.minLength(1))),
+    core: s.optional(s.string().check(s.minLength(1))),
+    kind: s.optional(s.string().check(s.minLength(1))),
+    level: s.optional(s.enum(EVENT_LEVELS)),
+    actor: s.optional(s.enum(['product', 'human', 'agent', 'ci', 'system'])),
+    correlationId: s.optional(s.string().check(s.minLength(1))),
+    text: s.optional(s.string().check(s.minLength(1))),
+    after: s.optional(s.string().check(s.minLength(1))),
+    limit: s.optional(s.int().check(s.gte(1), s.lte(500))),
+  }),
+);

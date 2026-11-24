@@ -13,6 +13,9 @@ const testbedConfigValidator = toValidator(
     dataDir: s.string().check(s.minLength(1)),
     runRetention: s.int().check(s.gte(1)),
     maxPayloadBytes: s.int().check(s.gte(1024)),
+    /** Set → agents and CI need `Authorization: Bearer <token>`. */
+    controlToken: s.optional(s.string().check(s.minLength(1))),
+    leaseTtlSec: s.int().check(s.gte(1)),
   }),
 );
 
@@ -39,5 +42,7 @@ export function loadTestbedConfig(
     dataDir: textOr(env.TESTBED_DATA_DIR, './data'),
     runRetention: intOr(env.TESTBED_RUN_RETENTION, 50),
     maxPayloadBytes: intOr(env.TESTBED_MAX_PAYLOAD_BYTES, 16_384),
+    controlToken: env.TESTBED_CONTROL_TOKEN === '' ? undefined : env.TESTBED_CONTROL_TOKEN,
+    leaseTtlSec: intOr(env.TESTBED_LEASE_TTL_SEC, 600),
   });
 }

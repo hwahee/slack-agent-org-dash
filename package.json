@@ -11,6 +11,7 @@
     "dev": "bun --watch src/server/index.ts",
     "build": "bun run scripts/build.ts",
     "compiler:report": "bun run scripts/react-compiler-report.ts",
+    "testbed:release": "bun run scripts/testbed-release.ts",
     "start": "cd dist && bun index.js",
     "test": "bun test",
     "typecheck": "tsc --noEmit",

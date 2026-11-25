@@ -126,6 +126,7 @@ export const en = {
   'testbed.config.title': 'Config',
   'testbed.config.label': 'Config (JSON)',
   'testbed.config.save': 'Save config',
+  'testbed.config.saved': 'Saved',
   'testbed.config.notJson': 'Not valid JSON: {message}',
   'testbed.config.restartRequired': 'Saved. It takes effect after a restart.',
   'testbed.config.restartNow': 'Restart now',

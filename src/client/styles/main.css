@@ -469,6 +469,7 @@ a {
 .tb-actions__buttons,
 .tb-faults__actions,
 .tb-faults__row-actions,
+.tb-editor__actions,
 .tb-editor__choice {
   display: flex;
   flex-wrap: wrap;

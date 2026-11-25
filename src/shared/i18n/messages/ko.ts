@@ -122,6 +122,7 @@ export const ko: Record<MessageKey, string> = {
   'testbed.config.title': '설정',
   'testbed.config.label': '설정(JSON)',
   'testbed.config.save': '설정 저장',
+  'testbed.config.saved': '저장됨',
   'testbed.config.notJson': 'JSON이 아님: {message}',
   'testbed.config.restartRequired': '저장됨. 재시작해야 적용됨',
   'testbed.config.restartNow': '지금 재시작',

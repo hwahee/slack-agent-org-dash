@@ -38,7 +38,7 @@
 - **복제 표**(외부 코어, `dashboard/replica-table.tsx`): 복제마다 한 행(id, 상태, pid, 재시작 횟수, 마지막 응답 ms, 엔드포인트). 행의 id 버튼을 누르면 그 아래에 stderr 최근 50줄(`GET /cores/:core/log?replica=`, 가림 적용)이 열리고, 열려 있는 동안 2초마다 다시 읽습니다.
 - **조작**: start / stop / reset(`POST /cores/:core/{op}`). 실패하면 오류 문장을 버튼 아래에 보여 줍니다.
   - 지금 상태에서 아무 일도 하지 않을 조작은 `disabled`입니다(`dashboard/core-ops.ts`): start는 `idle`·`stopped`·`error`일 때만, stop은 `running`일 때만 켜집니다(`starting`·`stopping` 동안은 둘 다 꺼짐). 외부 코어는 복제 상태로 판단해, 내려간 복제가 하나라도 있으면 start, 도는 복제가 하나라도 있으면 stop이 켜집니다. reset은 언제나 켜져 있습니다. stop의 강조색(`danger`)은 켜져 있을 때만 씁니다.
-- **설정**: 코어가 `configForm`을 등록했으면 그 폼, 아니면 JSON 편집기(TextArea, 들여쓰기 2칸). 저장은 `PATCH /cores/:core/config`이고, `VALIDATION_ERROR`의 `details`를 `경로: 문장` 줄로 편집기 아래에 보여 줍니다. JSON이 아니면 보내지 않고 그 자리에서 알립니다. 결과가 `restart-required`면 "재시작해야 적용됨 · 지금 재시작" 안내와 버튼(stop → start)을 띄웁니다.
+- **설정**: 코어가 `configForm`을 등록했으면 그 폼, 아니면 JSON 편집기(TextArea, 들여쓰기 2칸). 저장은 `PATCH /cores/:core/config`이고, `VALIDATION_ERROR`의 `details`를 `경로: 문장` 줄로 편집기 아래에 보여 줍니다. JSON이 아니면 보내지 않고 그 자리에서 알립니다. 결과가 `applied`면 저장 버튼 옆에 "저장됨"(`role="status"`)을 보여 주고, 다시 편집하면 지웁니다(결함 규칙 편집기와 같음). 결과가 `restart-required`면 "재시작해야 적용됨 · 지금 재시작" 안내와 버튼(stop → start)을 띄웁니다.
 - **액션**: `surfaces`에 `ui`가 있는 액션마다 버튼 하나. 누르면 액션 `description`과 `inputSchema`로 만든 폼이 열립니다(§1.4). 실행 결과(출력 JSON 또는 오류 문장)를 폼 아래에 보여 주고, 입력은 다음 실행을 위해 남겨 둡니다. `mutating: false` 액션은 락이 걸려도 실행할 수 있습니다.
   - 외부 코어면 폼 위에 대상 선택(전체 복제 / r0 / r1 …)이 있습니다(`?replica=`). 결과는 복제별로 나눠 보여 줍니다: 하나를 골랐으면 그 복제 하나, 전체면 `{ r0, r1, … }`의 자리마다(실패한 자리 `{ error }`는 오류 색).
 - **결함 규칙**: 매니페스트의 `faults`가 비어 있지 않을 때만 보입니다(§1.3).

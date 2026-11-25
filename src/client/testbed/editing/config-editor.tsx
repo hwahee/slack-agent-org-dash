@@ -1,8 +1,10 @@
 /**
  * A core's config: the core's own form when it registered one, otherwise a
  * JSON editor (2-space indent). Saving is `PATCH /cores/:core/config`;
- * validation issues show under the editor with their paths, and a
- * `restart-required` result offers to restart now (stop → start).
+ * validation issues show under the editor with their paths. An `applied`
+ * result shows "saved" next to the button until the next edit, the way the
+ * fault-rule editor does; a `restart-required` result offers to restart now
+ * (stop → start).
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -36,6 +38,7 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
   });
   const Form = module?.configForm;
   const [problems, setProblems] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
   const [restart, setRestart] = useState(false);
   const [restarting, setRestarting] = useState(false);
 
@@ -51,13 +54,24 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
     refetch,
   });
 
+  const editText = (draft: string) => {
+    setSaved(false);
+    textEditor.edit(draft);
+  };
+  const editForm = (draft: Config) => {
+    setSaved(false);
+    formEditor.edit(draft);
+  };
+
   async function submit(patch: Config) {
     setProblems([]);
+    setSaved(false);
     const outcome = await (Form ? formEditor : textEditor).save(() =>
       testbedApi.setConfig(core, patch),
     );
     if (outcome.ok) {
       setRestart(outcome.result.result === 'restart-required');
+      setSaved(outcome.result.result === 'applied');
       queryClient.setQueryData(configQueryKey(core), outcome.result.config);
       return;
     }
@@ -77,6 +91,8 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
       setRestarting(false);
     }
   }
+
+  const savedNote = saved && <span role="status">{t('testbed.config.saved')}</span>;
 
   const footer = (
     <>
@@ -118,21 +134,19 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
     return (
       <LockAwareEditor editor={formEditor} draftText={toText}>
         {value && (
-          <Form
-            core={core}
-            value={value}
-            onChange={formEditor.edit}
-            readOnly={formEditor.readOnly}
-          />
+          <Form core={core} value={value} onChange={editForm} readOnly={formEditor.readOnly} />
         )}
-        <OperateButton
-          onClick={() => {
-            if (value) void submit(value);
-          }}
-          testId={TESTID.testbed.configEditor.save(core)}
-        >
-          {t('testbed.config.save')}
-        </OperateButton>
+        <div className="tb-editor__actions">
+          <OperateButton
+            onClick={() => {
+              if (value) void submit(value);
+            }}
+            testId={TESTID.testbed.configEditor.save(core)}
+          >
+            {t('testbed.config.save')}
+          </OperateButton>
+          {savedNote}
+        </div>
         {footer}
       </LockAwareEditor>
     );
@@ -147,24 +161,28 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
         rows={Math.min(16, text.split('\n').length + 1)}
         readOnly={textEditor.readOnly}
         spellCheck={false}
-        onChange={(event) => textEditor.edit(event.target.value)}
+        onChange={(event) => editText(event.target.value)}
         testId={TESTID.testbed.configEditor.root(core)}
       />
-      <OperateButton
-        onClick={() => {
-          let patch: Config;
-          try {
-            patch = JSON.parse(text) as Config;
-          } catch (error) {
-            setProblems([t('testbed.config.notJson', { message: errorMessage(error) })]);
-            return;
-          }
-          void submit(patch);
-        }}
-        testId={TESTID.testbed.configEditor.save(core)}
-      >
-        {t('testbed.config.save')}
-      </OperateButton>
+      <div className="tb-editor__actions">
+        <OperateButton
+          onClick={() => {
+            let patch: Config;
+            try {
+              patch = JSON.parse(text) as Config;
+            } catch (error) {
+              setSaved(false);
+              setProblems([t('testbed.config.notJson', { message: errorMessage(error) })]);
+              return;
+            }
+            void submit(patch);
+          }}
+          testId={TESTID.testbed.configEditor.save(core)}
+        >
+          {t('testbed.config.save')}
+        </OperateButton>
+        {savedNote}
+      </div>
       {footer}
     </LockAwareEditor>
   );

@@ -126,6 +126,7 @@ test('4. lease: editing input survives a lease, every operation is aria-disabled
   await expect(editor).toHaveJSProperty('readOnly', false);
 
   await page.getByRole('button', { name: 'Save config' }).click();
+  await expect(config.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
   await expect
     .poll(
       async () =>

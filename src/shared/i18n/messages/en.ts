@@ -156,6 +156,21 @@ export const en = {
   'testbed.form.optional': 'optional',
   'testbed.json.invalidAt': 'Not valid JSON near line {line}, column {column}.',
   'testbed.json.invalid': 'Not valid JSON. Check the quotes, commas and brackets.',
+  'testbed.error.runActive':
+    "Run '{label}' is already open (opened by {who} at {time}). To close it and start a new one, tick “{option}” and start again.",
+  'testbed.error.coreNotRunning':
+    'Core {core} is {state}, not running. Press “{start}” on its card, then try again.',
+  'testbed.error.locked':
+    '{who} is in control, so operating is blocked · session {session} · {remaining} left. You can keep watching; try again once control ends.',
+  'testbed.error.restartRequired':
+    'The {core} settings for this Run apply only after a restart. Save them in the config, press “{stop}” then “{start}”, and start the Run.',
+  'testbed.error.noOpenRun': 'No Run is open.',
+  'testbed.error.notFound': "No {resource} '{id}' was found.",
+  'testbed.error.coreError': 'Core {core} answered with error {code}',
+  'testbed.error.coreExited':
+    'The process of core {core} ended before answering. Try again once it is back up.',
+  'testbed.error.coreTimeout':
+    'Core {core} did not answer within {timeoutMs} ms. Check its log and try again.',
   'testbed.issue.root': '(whole input)',
   'testbed.issue.required': 'Required',
   'testbed.issue.tooSmall': 'Must be at least {min}',

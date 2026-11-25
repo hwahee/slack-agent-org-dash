@@ -290,3 +290,36 @@ test('validation errors read as sentences that name the field', async ({ page })
   await expect(page.getByText('Pick an effect or set a delay')).toBeVisible();
   await expect(page.getByText('Must be a whole number of at least 1')).toBeVisible();
 });
+
+test.describe('away from UTC', () => {
+  // Server sentences say UTC times; the page must show the browser's own clock.
+  test.use({ timezoneId: 'Asia/Seoul' });
+
+  test('control-plane errors use the names on screen and local time', async ({ page }) => {
+    await openDashboard(page);
+    const opened = await api<{ startedAt: string }>('POST', '/runs', { body: { label: 'other' } });
+    expect(opened.status).toBe(201);
+    await page.getByRole('tab', { name: 'Runs' }).click();
+    await expect(page.getByTestId(TESTID.testbed.runs.endActive)).toBeVisible();
+    await page.getByLabel('label', { exact: true }).fill('mine');
+    await page.getByRole('button', { name: 'Start Run' }).click();
+    const time = await page.evaluate((ts) => {
+      const date = new Date(ts);
+      return [date.getHours(), date.getMinutes(), date.getSeconds()]
+        .map((part) => String(part).padStart(2, '0'))
+        .join(':');
+    }, opened.body.startedAt);
+    await expect(page.getByRole('alert').filter({ hasText: "Run 'other'" })).toHaveText(
+      `Run 'other' is already open (opened by human at ${time}). To close it and start a new one, tick “End the open Run first” and start again.`,
+    );
+
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    await expect(page.getByRole('img', { name: 'sample: stopped' })).toBeVisible();
+    await page.getByRole('button', { name: 'Broadcast' }).click();
+    await page.getByLabel('text', { exact: true }).fill('hi');
+    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(page.getByTestId(TESTID.testbed.action.result('sample', 'broadcast'))).toHaveText(
+      'Core sample is stopped, not running. Press “Start” on its card, then try again.',
+    );
+  });
+});

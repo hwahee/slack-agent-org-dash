@@ -151,6 +151,20 @@ export const ko: Record<MessageKey, string> = {
   'testbed.form.optional': '선택',
   'testbed.json.invalidAt': 'JSON이 아님: {line}번째 줄 {column}번째 칸 근처',
   'testbed.json.invalid': 'JSON이 아님. 따옴표·쉼표·괄호를 확인하세요',
+  'testbed.error.runActive':
+    "Run '{label}'이(가) 이미 열려 있음({who}이(가) {time}에 엶). 닫고 새로 시작하려면 '{option}'을 체크하고 다시 시작",
+  'testbed.error.coreNotRunning':
+    "코어 {core}가 running이 아니라 {state} 상태임. 코어 카드에서 '{start}'을 누른 뒤 다시 시도",
+  'testbed.error.locked':
+    '{who}가 제어 중이라 조작할 수 없음 · 세션 {session} · 남은 시간 {remaining}. 보기는 계속 가능하고, 제어가 끝나면 다시 시도',
+  'testbed.error.restartRequired':
+    "이 Run의 {core} 설정은 재시작해야 적용됨. 설정에 저장하고 '{stop}' → '{start}'을 누른 뒤 Run을 시작",
+  'testbed.error.noOpenRun': '열린 Run이 없음',
+  'testbed.error.notFound': "{resource} '{id}'을(를) 찾을 수 없음",
+  'testbed.error.coreError': '코어 {core}가 오류 {code}로 답함',
+  'testbed.error.coreExited': '코어 {core}의 프로세스가 답하기 전에 끝남. 다시 뜨면 다시 시도',
+  'testbed.error.coreTimeout':
+    '코어 {core}가 {timeoutMs}ms 안에 답하지 않음. 로그를 보고 다시 시도',
   'testbed.issue.root': '(전체)',
   'testbed.issue.required': '필수',
   'testbed.issue.tooSmall': '{min} 이상이어야 함',

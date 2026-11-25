@@ -1,13 +1,16 @@
 /**
  * Sentences for failed calls, in the page's language. The server's messages
- * are written for agents (and validation messages come from the schema
- * library, in English), so the dashboard builds its own from the error
- * `code` and `details`, falling back to the server's message only for codes
+ * are written for agents (tool names like `start_run`, UTC times) and
+ * validation messages come from the schema library, in English, so the
+ * dashboard builds its own from the error `code` and `details`: the names of
+ * its own controls, local time. The server's message is used only for codes
  * it does not know.
  */
 import type { MessageKey, MessageParams } from '@shared/i18n';
 
 import { ApiRequestError } from '../../api/http';
+import { mmss } from '../use-now';
+import { localTime } from '../views/event-display';
 
 export type Translate = (key: MessageKey, params?: MessageParams) => string;
 
@@ -148,10 +151,104 @@ export function errorLines(error: unknown, t: Translate): string[] {
   return lines.length > 0 ? lines : [errorMessage(error, t)];
 }
 
-/** The sentence to show for a failed call. */
+type Details = Record<string, unknown>;
+
+const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
+
+/** `py-echo r1` for one replica of an external core, else the core id. */
+function coreName(details: Details): string {
+  const core = text(details.core) ?? '?';
+  const replica = text(details.replica);
+  return replica === undefined ? core : `${core} ${replica}`;
+}
+
+/** Who a caller or lease view is, the way the lease banner names it. */
+function whoOf(value: unknown): string {
+  if (typeof value !== 'object' || value === null) return '?';
+  const { name, actor } = value as { name?: unknown; actor?: unknown };
+  return text(name) ?? text(actor) ?? '?';
+}
+
+/**
+ * The control plane's own codes (docs/testbed/control-plane.md §3), in the
+ * dashboard's words: its control names, local time. `null` when the code or
+ * the details are not ones it knows.
+ */
+function testbedSentence(error: ApiRequestError, t: Translate): string | null {
+  const details: Details =
+    typeof error.details === 'object' && error.details !== null ? (error.details as Details) : {};
+  const code: string = error.code;
+  switch (code) {
+    case 'RUN_ACTIVE': {
+      const startedAt = text(details.startedAt);
+      if (startedAt === undefined) return null;
+      return t('testbed.error.runActive', {
+        label: text(details.label) ?? text(details.runId) ?? '?',
+        who: whoOf(details.openedBy),
+        time: localTime(startedAt).slice(0, 8),
+        option: t('testbed.runs.endActive'),
+      });
+    }
+    case 'CORE_NOT_RUNNING':
+      return t('testbed.error.coreNotRunning', {
+        core: coreName(details),
+        state: text(details.state) ?? '?',
+        start: t('testbed.core.start'),
+      });
+    case 'LOCKED':
+    case 'LEASE_HELD': {
+      const holder = details.holder;
+      const session =
+        typeof holder === 'object' && holder !== null
+          ? text((holder as { holder?: unknown }).holder)
+          : undefined;
+      return t('testbed.error.locked', {
+        who: whoOf(holder),
+        session: session ?? '?',
+        remaining: mmss(typeof details.remainingMs === 'number' ? details.remainingMs : 0),
+      });
+    }
+    case 'RESTART_REQUIRED':
+      return t('testbed.error.restartRequired', {
+        core: coreName(details),
+        stop: t('testbed.core.stop'),
+        start: t('testbed.core.start'),
+      });
+    case 'NOT_FOUND': {
+      const resource = text(details.resource);
+      const id = text(details.id);
+      if (resource === 'run' && id === 'current') return t('testbed.error.noOpenRun');
+      if (resource === undefined || id === undefined) return null;
+      return t('testbed.error.notFound', { resource, id });
+    }
+    case 'CORE_ERROR': {
+      if (details.coreCode === 'EXITED') {
+        return t('testbed.error.coreExited', { core: coreName(details) });
+      }
+      const coreCode = text(details.coreCode);
+      if (coreCode === undefined) return null;
+      const sentence = t('testbed.error.coreError', { core: coreName(details), code: coreCode });
+      // The core's own words follow its code in the server sentence, when it gave any.
+      const at = error.message.indexOf(`${coreCode}: `);
+      return at === -1 ? sentence : `${sentence}: ${error.message.slice(at + coreCode.length + 2)}`;
+    }
+    case 'CORE_TIMEOUT':
+      return typeof details.timeoutMs === 'number'
+        ? t('testbed.error.coreTimeout', { core: coreName(details), timeoutMs: details.timeoutMs })
+        : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The sentence to show for a failed call. The boilerplate's own codes
+ * (`UNAUTHORIZED`, `INTERNAL_ERROR`, …) already arrive in the page's language.
+ */
 export function errorMessage(error: unknown, t: Translate): string {
   const lines = issueLines(error, t);
   if (lines.length > 0) return lines.join(' · ');
+  if (error instanceof ApiRequestError) return testbedSentence(error, t) ?? error.message;
   if (error instanceof Error) return error.message;
   return String(error);
 }

@@ -114,6 +114,19 @@
 서버의 오류 문장은 에이전트가 읽도록 쓴 것이고(도구 이름, UTC 시각), 검증 문장은 검증 라이브러리의 영어입니다. 화면은 이를 그대로 보이지 않고 `code`와 `details`로 화면의 언어(ko/en) 문장을 만듭니다(`src/client/testbed/editing/errors.ts`).
 
 - **검증 오류**(`VALIDATION_ERROR`): 문제마다 `경로: 문장` 한 줄. 경로가 비면 "(전체)", `unrecognized_keys`는 키마다 `키: 알 수 없는 키`. 문장은 `code`와 `params`([control-plane.md](control-plane.md) §3)로 만듭니다. 예: `too_small`(숫자) "1 이상이어야 함", 문자열 최소 1 "비워 둘 수 없음", `invalid_type`에 빠진 필드 "필수", `invalid_value` "debug, info 중 하나여야 함", `unknown_key` "설정에 없는 키". 모르는 `code`(코어가 직접 만든 `custom` 등)만 서버 문장을 씁니다.
+- **제어면 오류**([control-plane.md](control-plane.md) §3): `details`로 만들고, 도구·입력 이름 대신 화면의 컨트롤 이름을, UTC 대신 브라우저 시각을 씁니다.
+
+  | 코드                    | 화면 문장(ko)                                                                                                                   |
+  | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+  | `RUN_ACTIVE`            | "Run 'label'이(가) 이미 열려 있음(human이(가) 10:45:12에 엶). 닫고 새로 시작하려면 '열린 Run을 닫고 시작'을 체크하고 다시 시작" |
+  | `CORE_NOT_RUNNING`      | "코어 sample가 running이 아니라 stopped 상태임. 코어 카드에서 '시작'을 누른 뒤 다시 시도"(외부 코어는 `py-echo r1`처럼 복제)    |
+  | `LOCKED` · `LEASE_HELD` | 락 배너와 같은 보유자·세션·남은 시간: "claude-code가 제어 중이라 조작할 수 없음 · 세션 ab12 · 남은 시간 08:41. …"               |
+  | `RESTART_REQUIRED`      | "이 Run의 sample 설정은 재시작해야 적용됨. 설정에 저장하고 '정지' → '시작'을 누른 뒤 Run을 시작"                                |
+  | `NOT_FOUND`             | 열린 Run이 없으면 "열린 Run이 없음", 그 밖에는 "action 'sample.x'을(를) 찾을 수 없음"                                           |
+  | `CORE_ERROR`            | "코어 py-echo r0가 오류 BUSY로 답함: <코어의 문장>". `coreCode: 'EXITED'`면 프로세스가 끝났다고                                 |
+  | `CORE_TIMEOUT`          | "코어 py-echo r0가 5000ms 안에 답하지 않음. 로그를 보고 다시 시도"                                                              |
+
+  보일러플레이트 코드(`UNAUTHORIZED`, `INTERNAL_ERROR` 등)는 서버가 이미 화면 언어로 보내므로 그대로 씁니다. 필요한 `details`가 없으면 서버 문장을 씁니다.
 
 ## 2. 제어 락 표시
 

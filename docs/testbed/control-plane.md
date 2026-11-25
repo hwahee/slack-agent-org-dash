@@ -129,6 +129,7 @@
   - `POST /wait` `{ filter, count?, timeoutMs? }` → `{ events, timedOut }`. `after`가 없으면 부른 뒤부터 셉니다. 이 경로는 `Bun.serve`의 유휴 타임아웃을 끄고 받습니다(최대 120초 대기).
   - `POST /lease` → `{ leaseId, expiresAt }`. `DELETE /lease` → `{ released }`(보유자가 아니면 오류·거절 이벤트 없이 `released: false`)
 - 오류 코드의 HTTP 상태는 `src/shared/testbed/errors.ts`의 `TESTBED_ERROR_STATUS`가 원본입니다. 없는 경로는 JSON 404입니다.
+- 오류 `message`는 에이전트가 읽는 문장입니다(도구 이름, UTC 시각). 대시보드는 이를 보이지 않고 `code`와 `details`로 사람의 문장을 만듭니다([dashboard.md](dashboard.md) §1.7). 그래서 `details`의 필드(`RUN_ACTIVE`의 `label`·`openedBy`·`startedAt`, `CORE_NOT_RUNNING`의 `core`·`replica`·`state`, 락 오류의 `holder`·`remainingMs`, `CORE_ERROR`의 `coreCode`, `CORE_TIMEOUT`의 `timeoutMs` 등)는 문장을 바꿔도 유지합니다.
 - `start_run`의 `configOverrides`는 Run이 닫힐 때(교체 포함) Run 직전 설정으로 돌아갑니다. 하나라도 재시작이 필요하면 모두 되돌리고 `RESTART_REQUIRED`입니다.
 
 ## 4. MCP — `/testbed/mcp`

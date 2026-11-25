@@ -45,7 +45,7 @@ interface TestbedEvent<P = unknown> {
 | kind                                                                         | 뜻                                                                                                                            |
 | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `testbed.core.state`                                                         | 코어 상태 변화                                                                                                                |
-| `testbed.control.invoked`                                                    | 누가 어떤 조작을 했나                                                                                                         |
+| `testbed.control.invoked`                                                    | 누가 어떤 조작을 했나. payload `{ fn, input, caller, result, error? }`([control-plane.md](control-plane.md) §1.1)             |
 | `testbed.run.started` / `testbed.run.ended`                                  | Run 시작·종료                                                                                                                 |
 | `testbed.lease.acquired` / `.released` / `.expired` / `.denied`              | 제어 락 변화                                                                                                                  |
 | `testbed.check.evaluated`                                                    | 판정 결과                                                                                                                     |

@@ -24,7 +24,10 @@
 | `acquireLease` / `releaseLease` | –               | 제어 락                                                                                    |
 
 - 모든 함수는 `caller: { actor, sessionId?, leaseId?, name? }`를 받습니다. `sessionId`는 MCP 세션 id, `leaseId`는 REST로 잡은 락의 id, `name`은 표시 이름(예: MCP `clientInfo.name`)입니다.
-- 조작성 함수가 불리면 `testbed.control.invoked` 이벤트가 남습니다(함수 이름, 입력 요약, caller, 결과).
+- 조작성 함수가 불리면 `testbed.control.invoked` 이벤트가 남습니다. payload는 `{ fn, input, caller, result, error? }`입니다.
+  - `input`: 받은 입력. JSON이 2000자 이하면 값 그대로(상세 패널에서 트리로 펼침, 비밀값은 다른 payload처럼 버스가 가림), 넘으면 공통 가림 유틸로 가린 뒤의 JSON 앞 2000자에 `…`를 붙인 문자열입니다.
+  - `result`: 성공이면 `ok`, 실패면 REST·MCP가 돌려주는 것과 같은 오류 코드(`VALIDATION_ERROR`, `NOT_FOUND`, `RUN_ACTIVE` 등 §3, 그 밖의 예외는 `INTERNAL_ERROR`). summary는 `<actor> <fn> ok` 또는 `<actor> <fn> failed (<코드>)`입니다.
+  - `error`(실패만): `{ code, message?, issues? }`. `VALIDATION_ERROR`면 `issues`에 틀린 필드마다 `{ path, message, code? }`(최대 20개), 테스트베드 오류와 `NOT_FOUND`면 `message`(500자까지)가 들어갑니다. `INTERNAL_ERROR`의 문장은 서버 로그에만 남깁니다.
 - 호출자가 일으킨 이벤트(조작, check, Run 시작·종료, in-proc 코어의 액션)에는 봉투의 `caller`가 붙습니다. id는 앞 4자만 남습니다([events.md](events.md) §2).
 
 ### 1.2 이벤트 필터

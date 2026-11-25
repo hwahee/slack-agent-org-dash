@@ -3,6 +3,7 @@
  * docs/testbed/faults-and-seed.md §1). Every cell is text while editing; the
  * conversion back says which cell it could not read.
  */
+import type { MessageKey, MessageParams } from '@shared/i18n';
 import type { FaultKind } from '@shared/testbed/core';
 import type { FaultRule } from '@shared/testbed/faults';
 
@@ -27,7 +28,9 @@ export interface FaultRow {
 export interface FaultCellError {
   row: number;
   column: keyof FaultRow;
-  message: string;
+  /** What is wrong, as a message key (the editor translates it). */
+  problem: MessageKey;
+  params?: MessageParams;
 }
 
 /** A plain string value is written bare unless it would read back as something else. */
@@ -106,19 +109,19 @@ export function rowsToRules(rows: readonly FaultRow[]): {
   const rules: FaultRule[] = [];
   const errors: FaultCellError[] = [];
   rows.forEach((row, index) => {
-    const fail = (column: keyof FaultRow, message: string) =>
-      errors.push({ row: index, column, message });
+    const fail = (column: keyof FaultRow, problem: MessageKey, params?: MessageParams) =>
+      errors.push({ row: index, column, problem, ...(params === undefined ? {} : { params }) });
     const rule: FaultRule = { id: row.id.trim() };
-    if (rule.id === '') fail('id', 'required');
+    if (rule.id === '') fail('id', 'testbed.issue.required');
     else if (rows.slice(0, index).some((other) => other.id.trim() === rule.id))
-      fail('id', '같은 id가 위에 있음');
+      fail('id', 'testbed.issue.duplicateId');
 
     if (row.match.trim() !== '') {
       const match: Record<string, unknown> = {};
       for (const pair of splitPairs(row.match)) {
         const at = pair.indexOf('=');
         if (at <= 0) {
-          fail('match', `"${pair}" is not key=value`);
+          fail('match', 'testbed.issue.notKeyValue', { pair });
           continue;
         }
         match[pair.slice(0, at).trim()] = parseValue(pair.slice(at + 1).trim());
@@ -129,7 +132,7 @@ export function rowsToRules(rows: readonly FaultRow[]): {
     if (row.probability.trim() !== '') {
       const probability = Number(row.probability);
       if (!Number.isFinite(probability) || probability < 0 || probability > 1) {
-        fail('probability', '0–1');
+        fail('probability', 'testbed.issue.probability');
       } else {
         rule.probability = probability;
       }
@@ -140,17 +143,17 @@ export function rowsToRules(rows: readonly FaultRow[]): {
       const range = /^(\d+)\s*-\s*(\d+)$/.exec(delay);
       if (range) {
         const [min, max] = [Number(range[1]), Number(range[2])];
-        if (min > max) fail('delayMs', '최소값이 최대값보다 큼');
+        if (min > max) fail('delayMs', 'testbed.issue.delayRange');
         else rule.delayMs = { min, max };
       } else if (/^\d+$/.test(delay)) {
         rule.delayMs = Number(delay);
       } else {
-        fail('delayMs', 'ms or min-max');
+        fail('delayMs', 'testbed.issue.delay');
       }
     }
 
     if (row.effect === 'error') {
-      if (row.error.trim() === '') fail('error', 'required');
+      if (row.error.trim() === '') fail('error', 'testbed.issue.required');
       else rule.error = row.error.trim();
     } else if (row.effect === 'disconnect') {
       rule.disconnect = true;
@@ -158,16 +161,39 @@ export function rowsToRules(rows: readonly FaultRow[]): {
       rule.corrupt = true;
     }
 
-    if (delay === '' && row.effect === '') fail('effect', '효과나 지연 중 하나는 있어야 함');
+    if (delay === '' && row.effect === '') fail('effect', 'testbed.issue.noEffect');
 
     if (row.times.trim() !== '') {
       const times = Number(row.times);
-      if (!Number.isInteger(times) || times < 1) fail('times', 'integer ≥ 1');
+      if (!Number.isInteger(times) || times < 1) fail('times', 'testbed.issue.times');
       else rule.times = times;
     }
     rules.push(rule);
   });
   return { rules, errors };
+}
+
+const CELL_COLUMNS: readonly (keyof FaultRow)[] = [
+  'id',
+  'match',
+  'probability',
+  'delayMs',
+  'error',
+  'times',
+];
+
+/**
+ * The cell a server issue about `faults` belongs to (`faults.2.times` → row 2,
+ * `times`). An issue about a whole rule, or its `disconnect`/`corrupt` flag,
+ * goes on the effect cell. `null` for paths outside the rules.
+ */
+export function issueCell(path: string): { row: number; column: keyof FaultRow } | null {
+  const match = /^faults\.(\d+)(?:\.([^.]+))?/.exec(path);
+  if (!match) return null;
+  const row = Number(match[1]);
+  const field = match[2];
+  const column = CELL_COLUMNS.find((name) => name === field) ?? 'effect';
+  return { row, column };
 }
 
 /** Moves row `from` by `by` (−1 up, +1 down), within bounds. */

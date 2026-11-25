@@ -15,7 +15,7 @@ import { TESTID } from '../../testing/testids';
 import { Alert } from '../../ui/alert';
 import { TextArea } from '../../ui/text-area';
 import type { ClientCoreModule } from '../registry';
-import { errorMessage, issueLines } from './errors';
+import { errorLines, errorMessage, jsonErrorText } from './errors';
 import { LockAwareEditor } from './lock-aware-editor';
 import { OperateButton } from './operate-button';
 import { useLockAwareEditor } from './use-lock-aware-editor';
@@ -75,8 +75,7 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
       queryClient.setQueryData(configQueryKey(core), outcome.result.config);
       return;
     }
-    const lines = issueLines(outcome.error);
-    setProblems(lines.length > 0 ? lines : [errorMessage(outcome.error)]);
+    setProblems(errorLines(outcome.error, t));
   }
 
   async function restartNow() {
@@ -86,7 +85,7 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
       await testbedApi.operate(core, 'start');
       setRestart(false);
     } catch (error) {
-      setProblems([errorMessage(error)]);
+      setProblems([errorMessage(error, t)]);
     } finally {
       setRestarting(false);
     }
@@ -172,7 +171,7 @@ export function ConfigEditor({ core, module }: { core: string; module?: ClientCo
               patch = JSON.parse(text) as Config;
             } catch (error) {
               setSaved(false);
-              setProblems([t('testbed.config.notJson', { message: errorMessage(error) })]);
+              setProblems([jsonErrorText(error, text, t)]);
               return;
             }
             void submit(patch);

@@ -19,13 +19,13 @@ import { Button } from '../../ui/button';
 import { Select } from '../../ui/select';
 import { TextField } from '../../ui/text-field';
 import { configQueryKey } from './config-editor';
-import { errorMessage, issueLines } from './errors';
+import { errorMessage, issuesOf, issueText } from './errors';
 import {
   emptyRow,
+  issueCell,
   moveRow,
   rowsToRules,
   rulesToRows,
-  type FaultCellError,
   type FaultEffect,
   type FaultRow,
 } from './faults-table';
@@ -41,6 +41,12 @@ const HINTS: Partial<Record<(typeof TEXT_COLUMNS)[number], MessageKey>> = {
   delayMs: 'testbed.faults.hint.delayMs',
 };
 
+interface CellError {
+  row: number;
+  column: keyof FaultRow;
+  message: string;
+}
+
 function rulesOf(config: Record<string, unknown> | undefined): FaultRule[] | undefined {
   if (!config) return undefined;
   return Array.isArray(config.faults) ? (config.faults as FaultRule[]) : [];
@@ -53,7 +59,7 @@ export function FaultEditor({ core, kinds }: { core: string; kinds: readonly Fau
     queryKey: configQueryKey(core),
     queryFn: () => testbedApi.config(core),
   });
-  const [cellErrors, setCellErrors] = useState<FaultCellError[]>([]);
+  const [cellErrors, setCellErrors] = useState<CellError[]>([]);
   const [problems, setProblems] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const editor = useLockAwareEditor<FaultRow[], FaultRule[]>({
@@ -75,9 +81,30 @@ export function FaultEditor({ core, kinds }: { core: string; kinds: readonly Fau
   const cellError = (index: number, column: keyof FaultRow) =>
     cellErrors.find((error) => error.row === index && error.column === column)?.message;
 
+  /** Whether the editor shows this cell (delay only when supported, the error kind only for `error`). */
+  const shown = (row: number, column: keyof FaultRow) => {
+    const at = rows[row];
+    if (!at) return false;
+    if (column === 'delayMs') return canDelay;
+    if (column === 'error') return at.effect === 'error';
+    return true;
+  };
+  /** `faults.1.match` → "Rule 2 · match". */
+  const label = (path: string | undefined) =>
+    (path ?? '').replace(/^faults\.(\d+)\.?/, (_, n: string) => {
+      const rule = t('testbed.faults.rule', { n: Number(n) + 1 });
+      return path === `faults.${n}` ? rule : `${rule} · `;
+    }) || t('testbed.issue.root');
+
   async function save() {
     const { rules, errors } = rowsToRules(rows);
-    setCellErrors(errors);
+    setCellErrors(
+      errors.map(({ row, column, problem, params }) => ({
+        row,
+        column,
+        message: t(problem, params),
+      })),
+    );
     setProblems([]);
     if (errors.length > 0) return;
     const outcome = await editor.save(() => testbedApi.setConfig(core, { faults: rules }));
@@ -86,8 +113,22 @@ export function FaultEditor({ core, kinds }: { core: string; kinds: readonly Fau
       setSaved(true);
       return;
     }
-    const lines = issueLines(outcome.error);
-    setProblems(lines.length > 0 ? lines : [errorMessage(outcome.error)]);
+    const issues = issuesOf(outcome.error);
+    if (issues.length === 0) {
+      setProblems([errorMessage(outcome.error, t)]);
+      return;
+    }
+    // An issue about a cell shows on that cell; the rest go under the table.
+    const cells: CellError[] = [];
+    const lines: string[] = [];
+    for (const issue of issues) {
+      const message = issueText(issue, t);
+      const cell = issueCell(issue.path ?? '');
+      if (cell && shown(cell.row, cell.column)) cells.push({ ...cell, message });
+      else lines.push(`${label(issue.path)}: ${message}`);
+    }
+    setCellErrors(cells);
+    setProblems(lines);
   }
 
   return (
@@ -130,6 +171,9 @@ export function FaultEditor({ core, kinds }: { core: string; kinds: readonly Fau
                 label: effect === '' ? '—' : effect,
               }))}
               disabled={readOnly}
+              {...(cellError(index, 'effect') === undefined
+                ? {}
+                : { error: cellError(index, 'effect') })}
               onChange={(effect) => setCell(index, 'effect', effect)}
               testId={TESTID.testbed.faults.cell(core, index, 'effect')}
             />

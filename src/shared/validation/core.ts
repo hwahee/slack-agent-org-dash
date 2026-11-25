@@ -16,6 +16,14 @@ export interface ValidationIssue {
   readonly message: string;
   /** Stable machine-readable code, e.g. `"too_small"`. */
   readonly code: string;
+  /**
+   * What a localized sentence needs besides `code`, e.g. `{ origin: 'number',
+   * minimum: 1, inclusive: true }` for `too_small`. Keys depend on the code:
+   * `origin`, `minimum`, `maximum`, `inclusive`, `expected`, `received`
+   * (the JS type found, `undefined` when missing), `values`, `keys`,
+   * `format`, `divisor`. Absent when there is nothing to add.
+   */
+  readonly params?: Readonly<Record<string, unknown>>;
 }
 
 export type ValidationResult<T> =

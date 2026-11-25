@@ -40,6 +40,36 @@ describe('validation facade', () => {
     if (!bad.ok) expect(bad.issues[0]?.path).toBe('name');
   });
 
+  test('issues carry what a localized sentence needs in params', () => {
+    const shaped = toValidator(
+      s.strictObject({
+        port: s.int().check(s.gte(1), s.lte(10)),
+        level: s.enum(['debug', 'info']),
+        name: s.string(),
+      }),
+    );
+    const result = shaped.safeParse({ port: 0, level: 'x', extra: 1 });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const byPath = new Map(result.issues.map((issue) => [issue.path, issue]));
+    expect(byPath.get('port')).toMatchObject({
+      code: 'too_small',
+      params: { origin: 'number', minimum: 1, inclusive: true },
+    });
+    expect(byPath.get('level')).toMatchObject({
+      code: 'invalid_value',
+      params: { values: ['debug', 'info'] },
+    });
+    expect(byPath.get('name')).toMatchObject({
+      code: 'invalid_type',
+      params: { expected: 'string', received: 'undefined' },
+    });
+    expect(byPath.get('')).toMatchObject({
+      code: 'unrecognized_keys',
+      params: { keys: ['extra'] },
+    });
+  });
+
   test('nested paths are dotted', () => {
     const nested = toValidator(s.object({ user: s.object({ email: s.string() }) }));
     const result = nested.safeParse({ user: { email: 7 } });

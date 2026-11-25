@@ -177,7 +177,7 @@ export function RunsPanel() {
       await queryClient.invalidateQueries({ queryKey: ['testbed', 'runs'] });
       return true;
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(errorMessage(failure, t));
       return false;
     } finally {
       setBusy(false);

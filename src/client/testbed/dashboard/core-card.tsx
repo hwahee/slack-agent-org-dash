@@ -43,7 +43,7 @@ export function CoreCard({ core, status }: { core: ManifestCore; status: CoreSta
     try {
       await testbedApi.operate(core.id, op);
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(errorMessage(failure, t));
     } finally {
       setBusy(null);
     }

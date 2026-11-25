@@ -40,12 +40,57 @@ interface ZodLikeIssue {
   readonly code?: string;
 }
 
-function toIssues(issues: readonly ZodLikeIssue[]): ValidationIssue[] {
-  return issues.map((issue) => ({
-    path: issue.path.map(String).join('.'),
-    message: issue.message,
-    code: issue.code ?? 'invalid',
-  }));
+/** The issue fields a localized sentence can use (see `ValidationIssue.params`). */
+const PARAM_KEYS = [
+  'origin',
+  'minimum',
+  'maximum',
+  'inclusive',
+  'expected',
+  'values',
+  'keys',
+  'format',
+  'divisor',
+] as const;
+
+/** JSON-safe: a bigint bound becomes a number. */
+function plain(value: unknown): unknown {
+  if (typeof value === 'bigint') return Number(value);
+  if (Array.isArray(value)) return value.map(plain);
+  return value;
+}
+
+/** The JS type at `path` in `input` (`undefined` when missing, `array`, `null`). */
+function receivedAt(input: unknown, path: readonly PropertyKey[]): string {
+  let value = input;
+  for (const key of path) {
+    if (typeof value !== 'object' || value === null) return 'undefined';
+    value = (value as Record<PropertyKey, unknown>)[key];
+  }
+  if (value === null) return 'null';
+  return Array.isArray(value) ? 'array' : typeof value;
+}
+
+function paramsOf(issue: ZodLikeIssue, input: unknown): Record<string, unknown> | undefined {
+  const source = issue as unknown as Record<string, unknown>;
+  const params: Record<string, unknown> = {};
+  for (const key of PARAM_KEYS) {
+    if (source[key] !== undefined) params[key] = plain(source[key]);
+  }
+  if (issue.code === 'invalid_type') params.received = receivedAt(input, issue.path);
+  return Object.keys(params).length > 0 ? params : undefined;
+}
+
+function toIssues(issues: readonly ZodLikeIssue[], input: unknown): ValidationIssue[] {
+  return issues.map((issue) => {
+    const params = paramsOf(issue, input);
+    return {
+      path: issue.path.map(String).join('.'),
+      message: issue.message,
+      code: issue.code ?? 'invalid',
+      ...(params === undefined ? {} : { params }),
+    };
+  });
 }
 
 /** The schema behind each validator, for {@link toJsonSchema}. */
@@ -56,14 +101,14 @@ export function toValidator<T>(schema: ZodLikeSchema<T>): Validator<T> {
   const validator: Validator<T> = {
     parse(input: unknown): T {
       const result = schema.safeParse(input);
-      if (!result.success) throw new ValidationError(toIssues(result.error.issues));
+      if (!result.success) throw new ValidationError(toIssues(result.error.issues, input));
       return result.data;
     },
     safeParse(input: unknown): ValidationResult<T> {
       const result = schema.safeParse(input);
       return result.success
         ? { ok: true, value: result.data }
-        : { ok: false, issues: toIssues(result.error.issues) };
+        : { ok: false, issues: toIssues(result.error.issues, input) };
     },
   };
   schemas.set(validator, schema);

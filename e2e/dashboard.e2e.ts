@@ -261,3 +261,32 @@ test('core card: start and stop are enabled only when they would do something', 
   await expect(start).toBeDisabled();
   await expect(stop).toBeEnabled();
 });
+
+test('validation errors read as sentences that name the field', async ({ page }) => {
+  await openDashboard(page);
+  const editor = await configEditor(page);
+  const errors = page.getByTestId(TESTID.testbed.configEditor.errors('sample'));
+  await editor.fill(
+    JSON.stringify({ ...JSON.parse(await editor.inputValue()), maxConnections: 0 }, null, 2),
+  );
+  await page.getByRole('button', { name: 'Save config' }).click();
+  await expect(errors).toHaveText('maxConnections: Must be at least 1');
+  await editor.fill('{\n  maxConnections: 5\n}');
+  await page.getByRole('button', { name: 'Save config' }).click();
+  await expect(errors).toHaveText('Not valid JSON near line 2, column 3.');
+
+  await page.getByRole('button', { name: 'Broadcast' }).click();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await expect(page.getByTestId(TESTID.testbed.action.result('sample', 'broadcast'))).toHaveText(
+    'text: Must not be empty',
+  );
+  await expect(page.getByLabel('text', { exact: true })).toHaveAccessibleDescription(
+    'Must not be empty',
+  );
+
+  await page.getByRole('button', { name: 'Add rule' }).click();
+  await page.getByTestId(TESTID.testbed.faults.cell('sample', 0, 'times')).fill('0');
+  await page.getByRole('button', { name: 'Save rules' }).click();
+  await expect(page.getByText('Pick an effect or set a delay')).toBeVisible();
+  await expect(page.getByText('Must be a whole number of at least 1')).toBeVisible();
+});

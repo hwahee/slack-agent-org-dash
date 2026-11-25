@@ -117,6 +117,7 @@
   | `CORE_ERROR`       | 502  | 외부 코어가 자기 오류 코드로 실패함(`details.coreCode`). 프로세스가 답하기 전에 끝나면 `coreCode: 'EXITED'`. 코어가 제어면 코드(`VALIDATION_ERROR`, `CORE_NOT_RUNNING` 등)를 돌려주면 그 코드와 상태를 그대로 씀([external-core-protocol.md](external-core-protocol.md) §4.4) |
   | `CORE_TIMEOUT`     | 504  | 외부 코어가 `requestTimeoutMs` 안에 답하지 않음. 프로세스는 그대로 둠                                                                                                                                                                                                         |
 
+- `VALIDATION_ERROR`(400)의 `details`는 틀린 필드마다 `{ path, message, code, params? }`입니다. `message`는 검증 라이브러리의 영어 문장이라 사람에게 그대로 보이지 않습니다. 화면은 `code`(`too_small`, `too_big`, `invalid_type`, `invalid_value`, `unrecognized_keys`, `unknown_key`, `duplicate_id`, `no_effect`, `delay_range`, `unsupported_fault` 등)와 `params`(`origin`, `minimum`, `maximum`, `inclusive`, `expected`, `received`, `values`, `keys`, `format`, `divisor` 중 해당하는 것. `received`는 찾은 값의 JS 타입이고 빠진 필드면 `undefined`)로 자기 언어의 문장을 만듭니다(`@shared/validation`의 `ValidationIssue`).
 - 응답 모양
   - `GET /status` → `{ instanceId, cores: CoreStatus[], run: RunMeta | null, lease: LeaseView | null }`
   - `PATCH /cores/:core/config` → `{ result: 'applied' | 'restart-required', config }`

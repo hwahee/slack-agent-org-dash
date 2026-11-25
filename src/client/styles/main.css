@@ -7,6 +7,14 @@
   box-sizing: border-box;
 }
 
+/* Korean breaks between words, not between syllables: a narrow column
+   would otherwise end a line in the middle of a word ("보입/니다").
+   break-word still breaks a word that is wider than the whole line. */
+html:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -350,6 +358,16 @@ a {
   overflow-wrap: anywhere;
 }
 
+/* An address and its copy button wrap as one: in a narrow column (or the
+   kids skin's padded code) the button stays beside the address it copies. */
+.tb-connection__value {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .tb-connection__snippet-head,
 .tb-detail__head {
   display: flex;
@@ -500,6 +518,12 @@ a {
   font-size: var(--font-size-sm);
 }
 
+/* Move and remove act on the whole rule: their own line, not a cell squeezed
+   between the inputs. */
+.tb-faults__row-actions {
+  grid-column: 1 / -1;
+}
+
 .tb-code[data-ok='false'] {
   color: var(--color-danger);
 }
@@ -507,6 +531,7 @@ a {
 .tb-faults__row {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  align-items: start;
   gap: var(--space-2);
   margin: 0;
   padding: var(--space-2);
@@ -537,7 +562,8 @@ a {
 
 .tb-log__filters {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  /* Wide enough for the longest option ("현재(없으면 전체)") in every skin. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
   gap: var(--space-2);
   font-size: var(--font-size-sm);
 }
@@ -1095,6 +1121,7 @@ a {
 
 .alert {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -1102,8 +1129,12 @@ a {
   border: var(--border-width) solid currentcolor;
 }
 
+/* The text keeps a readable width; when the action does not fit beside it
+   (a narrow column), the action moves to its own line instead of squeezing
+   the text into one word per line. */
 .alert__body {
-  flex: 1;
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 .alert--info {

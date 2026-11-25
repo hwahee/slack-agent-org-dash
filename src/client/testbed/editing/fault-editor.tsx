@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
+import type { MessageKey } from '@shared/i18n';
 import type { FaultKind } from '@shared/testbed/core';
 import type { FaultRule } from '@shared/testbed/faults';
 
@@ -33,6 +34,12 @@ import { OperateButton } from './operate-button';
 import { useLockAwareEditor } from './use-lock-aware-editor';
 
 const TEXT_COLUMNS = ['id', 'match', 'probability', 'delayMs', 'times'] as const;
+/** The accepted format goes under the input, so every label stays one short line. */
+const HINTS: Partial<Record<(typeof TEXT_COLUMNS)[number], MessageKey>> = {
+  match: 'testbed.faults.hint.match',
+  probability: 'testbed.faults.hint.probability',
+  delayMs: 'testbed.faults.hint.delayMs',
+};
 
 function rulesOf(config: Record<string, unknown> | undefined): FaultRule[] | undefined {
   if (!config) return undefined;
@@ -101,10 +108,12 @@ export function FaultEditor({ core, kinds }: { core: string; kinds: readonly Fau
             </legend>
             {TEXT_COLUMNS.filter((column) => column !== 'delayMs' || canDelay).map((column) => {
               const error = cellError(index, column);
+              const hint = HINTS[column];
               return (
                 <TextField
                   key={column}
                   label={t(`testbed.faults.column.${column}`)}
+                  {...(hint === undefined ? {} : { hint: t(hint) })}
                   value={row[column]}
                   readOnly={readOnly}
                   {...(error === undefined ? {} : { error })}

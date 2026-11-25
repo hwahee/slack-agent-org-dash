@@ -44,14 +44,16 @@ export function ConnectionPanel({
               <span className="muted">
                 {core.id} · {endpoint.name}
               </span>
-              <code data-testid={TESTID.testbed.connection.endpoint(core.id, endpoint.name)}>
-                {endpoint.url}
-              </code>
-              <CopyButton
-                text={endpoint.url}
-                label={`${core.id} ${endpoint.name}`}
-                testId={TESTID.testbed.connection.copyEndpoint(core.id, endpoint.name)}
-              />
+              <span className="tb-connection__value">
+                <code data-testid={TESTID.testbed.connection.endpoint(core.id, endpoint.name)}>
+                  {endpoint.url}
+                </code>
+                <CopyButton
+                  text={endpoint.url}
+                  label={`${core.id} ${endpoint.name}`}
+                  testId={TESTID.testbed.connection.copyEndpoint(core.id, endpoint.name)}
+                />
+              </span>
             </li>
           )),
         )}

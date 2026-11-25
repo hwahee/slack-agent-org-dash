@@ -81,7 +81,7 @@
   - 열린 Run이 아닌 Run을 고르면 스토어 대신 `GET /events?runId=…`를 커서로 이어 받습니다(500건씩, 최대 20,000건).
 - **상세 패널**(`detail-panel.tsx`): 고른 이벤트를 `GET /events/:id`로 다시 읽습니다(링버퍼에서 밀려나 404면 목록의 이벤트를 그대로 씀). 봉투 필드(시각은 로컬과 UTC)와 payload 트리. 트리는 두 단계까지 펼쳐 두고, 줄마다 경로(`data-path="payload.lease.holder"`, `payload.items[0]`)를 붙입니다. 제목 옆 버튼은 이벤트 전체를 JSON(들여쓰기 2칸)으로 복사합니다. 공통 가림 형식(`앞4자…(len n, sha256:12자)`)의 값은 점선으로 강조하고 "가린 값" 배지를 붙입니다. `correlationId`가 있으면 같은 묶음의 이벤트를 REST(`GET /events?correlationId=…`, 같은 Run)로 가져와 보여 주고, 누르면 그 이벤트로 바뀝니다.
 - **통계**(`stats-panel.tsx`): 대상은 열린 Run의 이벤트(없으면 스토어 전체). kind별·level별 건수, 오류율(`error` / 전체), `latencyMs`가 있는 kind의 건수·평균·p95(nearest-rank)·최대. 초당 이벤트 수(최근 60초) 스파크라인은 `<canvas>`에 `requestAnimationFrame`으로 직접 그리고, 초나 데이터가 바뀔 때만 다시 그립니다.
-- **Run**(`runs-panel.tsx`): 열린 Run(label, runId, 시작 시각, 연 주체, 경과 시간, seed)과 종료 버튼, 시작 폼(label, seed, "열린 Run을 닫고 시작"), 지난 Run 목록(`GET /runs`). 고르면 요약(기간, kind·level별 건수, 오류 상위, check 결과)과 내보내기 링크. `openedBy`와 `endedBy`가 다르면 "다른 주체가 닫음", `endReason`이 `replaced`·`restart`면 그 사유를 배지로 보여 줍니다.
+- **Run**(`runs-panel.tsx`): 열린 Run(label, runId, 시작 시각, 연 주체, 경과 시간, seed)과 종료 버튼, 시작 폼(label, seed, "열린 Run을 닫고 시작"; 폼 폭은 24rem까지), 지난 Run 목록(`GET /runs`). "열린 Run을 닫고 시작"은 열린 Run이 있을 때만 보이고, 체크는 체크할 때 열려 있던 그 Run에만 걸립니다(다른 Run으로 바뀌면 풀림). 시작에 성공하면 label·seed·체크를 비웁니다. 고르면 요약(기간, kind·level별 건수, 오류 상위, check 결과)과 내보내기 링크. `openedBy`와 `endedBy`가 다르면 "다른 주체가 닫음", `endReason`이 `replaced`·`restart`면 그 사유를 배지로 보여 줍니다.
 - **에이전트 타임라인**(`agent-timeline.tsx`): actor가 `agent`인 이벤트와 `testbed.control.*`, `testbed.lease.*`만 시간순(최근 500건). 항목마다 caller 이름과 세션(또는 lease id) 앞 4자를 붙입니다. caller는 `payload.caller`, 없으면 `payload.lease`(보유자)에서 읽습니다. 누르면 상세 패널에 보입니다.
 
 ### 1.6 연결 패널 조각

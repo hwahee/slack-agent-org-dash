@@ -526,6 +526,15 @@ a {
   gap: var(--space-2);
 }
 
+/* The start form keeps to a form's width instead of the whole main area. */
+.tb-runs__start {
+  max-width: 24rem;
+}
+
+.tb-runs__start > .btn {
+  align-self: flex-start;
+}
+
 .tb-log__filters {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));

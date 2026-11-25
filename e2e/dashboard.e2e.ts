@@ -65,9 +65,15 @@ test('2. event flow: TCP data shows up in the log, and its payload in the detail
 test('3. Run: start from the Run tab, data, end; the past Run summarizes it', async ({ page }) => {
   await openDashboard(page);
   await page.getByRole('tab', { name: 'Runs' }).click();
-  await page.getByLabel('label', { exact: true }).fill('ui-run');
+  const label = page.getByLabel('label', { exact: true });
+  const endActive = page.getByTestId(TESTID.testbed.runs.endActive);
+  await expect(endActive).toHaveCount(0);
+  await label.fill('ui-run');
   await page.getByRole('button', { name: 'Start Run' }).click();
   await expect(page.getByTestId(TESTID.testbed.statusBar.run)).toContainText('Run ui-run');
+  // The form is cleared; "end the open Run" appears now that one is open, unticked.
+  await expect(label).toHaveValue('');
+  await expect(endActive).not.toBeChecked();
 
   const client = await tcp();
   client.send('hello');
@@ -75,6 +81,7 @@ test('3. Run: start from the Run tab, data, end; the past Run summarizes it', as
   await page.getByRole('button', { name: 'End Run' }).click();
 
   await expect(page.getByTestId(TESTID.testbed.statusBar.run)).toHaveText('No open Run');
+  await expect(endActive).toHaveCount(0);
   await page.getByRole('button', { name: /^ui-run run-/ }).click();
   const summary = page.getByTestId(TESTID.testbed.runs.summary);
   await expect(summary.getByRole('row', { name: 'sample.data.echoed 1' })).toBeVisible();

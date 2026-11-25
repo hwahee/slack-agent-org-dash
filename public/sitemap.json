@@ -1,15 +1,15 @@
 {
-  "updatedAt": "2026-08-25",
+  "updatedAt": "2026-11-25",
   "services": [
+    {
+      "name": "testbed-base",
+      "url": "https://github.com/hwahee/testbed-base",
+      "description": "The common runtime every testbed starts from"
+    },
     {
       "name": "Boilerplate",
       "url": "https://github.com/hwahee/boilerplate",
       "description": "React + Bun fullstack starter"
-    },
-    {
-      "name": "Example Service",
-      "url": "https://example.hwahee.com",
-      "description": "Replace this entry with a real service"
     }
   ]
 }

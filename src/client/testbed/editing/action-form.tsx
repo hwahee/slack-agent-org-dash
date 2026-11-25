@@ -19,7 +19,7 @@ import { Checkbox } from '../../ui/checkbox';
 import { Select } from '../../ui/select';
 import { TextArea } from '../../ui/text-area';
 import { TextField } from '../../ui/text-field';
-import { errorMessage } from './errors';
+import { errorLines, issuesOf, issueText, jsonErrorText } from './errors';
 import { LockAwareEditor } from './lock-aware-editor';
 import { OperateButton } from './operate-button';
 import { formInput, formSpec, initialValues, type FormValues } from './schema-form';
@@ -97,10 +97,7 @@ function ActionForm({
       try {
         input = JSON.parse(value) as unknown;
       } catch (error) {
-        setResult({
-          ok: false,
-          text: t('testbed.config.notJson', { message: errorMessage(error) }),
-        });
+        setResult({ ok: false, text: jsonErrorText(error, value, t) });
         return;
       }
     } else {
@@ -120,7 +117,14 @@ function ActionForm({
     );
     setRunning(false);
     if (!outcome.ok) {
-      setResult({ ok: false, text: errorMessage(outcome.error) });
+      // Each issue as `field: sentence`; a form field the server named shows it too.
+      setResult({ ok: false, text: errorLines(outcome.error, t).join('\n') });
+      const named = issuesOf(outcome.error).filter((issue) =>
+        fields.some((field) => field.name === issue.path),
+      );
+      setFieldErrors(
+        Object.fromEntries(named.map((issue) => [issue.path ?? '', issueText(issue, t)])),
+      );
       return;
     }
     const split = byReplica(outcome.result, target, replicas);

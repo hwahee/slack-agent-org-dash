@@ -16,11 +16,13 @@ import {
   type TestbedEvent,
 } from '@shared/testbed/events';
 import type { RunMeta } from '@shared/testbed/runs';
+import { ValidationError, type ValidationIssue } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
 import type { BaseCoreConfig } from '../core';
 import { TestbedError } from '../errors';
 import { queryLimit } from '../events/filter';
+import { redact } from '../redact';
 import { runCheck, type CheckInput, type CheckResult } from '../runs/check';
 import type { TestbedRuntime } from '../runtime';
 import { publicCaller } from './caller';
@@ -29,7 +31,11 @@ import type { LeaseManager } from './lease';
 const ALL_CORES = '_all';
 const DEFAULT_WAIT_MS = 30_000;
 const MAX_WAIT_MS = 120_000;
-const INPUT_SUMMARY_CHARS = 200;
+/** An input whose JSON is longer is recorded as a cut string (docs/testbed/control-plane.md §1.1). */
+const INPUT_RECORD_CHARS = 2000;
+const ERROR_MESSAGE_CHARS = 500;
+/** At most this many validation issues are recorded. */
+const RECORDED_ISSUES = 20;
 
 export interface ManifestInfo {
   name: string;
@@ -57,15 +63,38 @@ export interface WaitRequest {
   timeoutMs?: number;
 }
 
-function summarizeInput(input: unknown): string {
-  const json = JSON.stringify(input) ?? '';
-  return json.length > INPUT_SUMMARY_CHARS ? `${json.slice(0, INPUT_SUMMARY_CHARS)}…` : json;
+/**
+ * The input as `testbed.control.invoked` records it: the value itself while
+ * its JSON is short (the bus masks its secrets like any payload), else the
+ * front of its JSON with secrets masked first — a string hides its keys from
+ * the bus.
+ */
+export function recordedInput(input: unknown): unknown {
+  const json = JSON.stringify(input);
+  if (json === undefined) return null;
+  if (json.length <= INPUT_RECORD_CHARS) return input;
+  return `${(JSON.stringify(redact(input)) ?? '').slice(0, INPUT_RECORD_CHARS)}…`;
 }
 
-function errorCode(error: unknown): string {
-  if (error instanceof TestbedError) return error.code;
-  if (error instanceof Error) return error.name;
-  return 'Error';
+/** What failed, as callers see it: the code REST and MCP answer with, and for bad input each issue. */
+export interface RecordedError {
+  code: string;
+  message?: string;
+  issues?: ValidationIssue[];
+}
+
+export function recordedError(error: unknown): RecordedError {
+  const cut = (message: string) => message.slice(0, ERROR_MESSAGE_CHARS);
+  if (error instanceof TestbedError) return { code: error.code, message: cut(error.message) };
+  if (error instanceof ValidationError) {
+    return {
+      code: 'VALIDATION_ERROR',
+      issues: error.issues.slice(0, RECORDED_ISSUES).map((issue) => ({ ...issue })),
+    };
+  }
+  if (error instanceof NotFoundError) return { code: 'NOT_FOUND', message: cut(error.message) };
+  // Anything else is a fault of ours; its message stays in the server log.
+  return { code: 'INTERNAL_ERROR' };
 }
 
 export class ControlService {
@@ -337,6 +366,30 @@ export class ControlService {
     );
   }
 
+  /** A sentence about an action's result for MCP `content` (not an operation, no lease). */
+  actionResultText(core: string, name: string, output: unknown): string {
+    return (
+      this.rt.host.actionResultText(core, name, output) ??
+      `${core} ${name} 결과: ${JSON.stringify(output)}`
+    );
+  }
+
+  /**
+   * For a NOT_FOUND message: the ids that do exist (`core` → core ids,
+   * `action` with `<core>.<name>` → that core's actions). `undefined` when
+   * there is no short list to give (events, Runs).
+   */
+  knownIds(resource: string, id: string): string[] | undefined {
+    const { host } = this.rt;
+    if (resource === 'core') return host.ids();
+    if (resource === 'action') {
+      const core = id.slice(0, id.lastIndexOf('.'));
+      if (!host.ids().includes(core)) return host.ids();
+      return host.describe(core).actions.map((action) => `${core}.${action.name}`);
+    }
+    return undefined;
+  }
+
   // ── Lease ────────────────────────────────────────────────────────────────
 
   acquireLease(caller: Caller) {
@@ -365,30 +418,39 @@ export class ControlService {
     input: unknown,
     body: () => Promise<T>,
   ): Promise<T> {
-    this.lease.authorize(caller, fn, true);
+    const acquired = this.lease.authorize(caller, fn, true);
     const recorded = publicCaller(caller);
     try {
       const result = await body();
-      this.invoked(fn, recorded, input, 'ok');
+      this.invoked(fn, recorded, input);
       return result;
     } catch (error) {
-      this.invoked(fn, recorded, input, errorCode(error));
+      this.invoked(fn, recorded, input, recordedError(error));
+      if (acquired) this.lease.undoAcquire(caller);
       throw error;
     }
   }
 
-  private invoked(fn: string, caller: Caller, input: unknown, result: string): void {
-    const summary = summarizeInput(input);
+  /** `error` absent → it succeeded. */
+  private invoked(fn: string, caller: Caller, input: unknown, error?: RecordedError): void {
+    const result = error?.code ?? 'ok';
     this.rt.bus.emit({
       core: 'testbed',
       kind: 'testbed.control.invoked',
-      level: result === 'ok' ? 'info' : 'warn',
+      level: error === undefined ? 'info' : 'warn',
       actor: caller.actor,
-      summary: `${caller.actor} ${fn} ${result === 'ok' ? 'ok' : `failed (${result})`}`.slice(
+      caller,
+      summary: `${caller.actor} ${fn} ${error === undefined ? 'ok' : `failed (${result})`}`.slice(
         0,
         200,
       ),
-      payload: { fn, input: summary, caller, result },
+      payload: {
+        fn,
+        input: recordedInput(input),
+        caller,
+        result,
+        ...(error === undefined ? {} : { error }),
+      },
     });
   }
 

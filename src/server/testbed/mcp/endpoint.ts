@@ -181,7 +181,7 @@ export class McpEndpoint {
         };
         return result;
       } catch (error) {
-        return errorResult(error);
+        return errorResult(error, (resource, id) => this.options.control.knownIds(resource, id));
       } finally {
         if (session) {
           session.inflight -= 1;

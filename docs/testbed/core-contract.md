@@ -28,7 +28,7 @@ interface CoreDefinition<C extends BaseCoreConfig, I extends CoreInstance> {
 }
 
 interface CoreContext<C> {
-  emit(e: CoreEventInput): void; // core·actor(기본 'product')와 봉투의 공통 필드는 런타임이 채움. kind는 '<id>.'로 시작해야 함
+  emit(e: CoreEventInput): void; // core·actor(기본 'product')와 봉투의 공통 필드는 런타임이 채움. kind는 '<id>.'로 시작해야 함. 액션 실행 중 그 caller의 actor로 낸 이벤트에는 caller가 붙음(§4)
   log: Logger;
   rng: SeededRng; // 모든 무작위는 이것으로. 열린 Run의 seed, 없으면 부팅 seed
   run(): RunMeta | null; // 열린 Run, 없으면 null
@@ -79,15 +79,17 @@ idle → starting → running → stopping → stopped
 ```ts
 interface ActionDefinition<I extends CoreInstance> {
   title: string;
-  description: string; // 에이전트가 읽는 설명 — 부작용, 단위, 상한, 락 필요 여부를 적음
+  description: string; // 에이전트와 사람이 읽는 설명 — 부작용, 단위, 상한. 한국어 평문(대시보드에 그대로 보이므로 백틱 같은 마크다운 없이). 락 필요 여부는 적지 않음(MCP가 mutating으로 "(제어 락 필요)"·"(읽기 전용)"을 붙임)
   input: Validator<unknown>;
   output: Validator<unknown>;
   mutating: boolean; // true면 제어 락이 필요함
   surfaces?: ('rest' | 'mcp' | 'ui')[]; // 기본: 셋 다
   run(instance: I, input: unknown, caller: Caller): Promise<unknown>; // 검증된 입력으로 불림
+  summarize?(output: unknown): string; // MCP content에 쓸 결과 한 문장(한국어). 없으면 출력 JSON
 }
 ```
 
+- 액션이 일으킨 이벤트는 `actor: caller.actor`로 냅니다. 액션을 실행하는 동안(그 비동기 흐름 안에서) 그 actor로 낸 이벤트에는 런타임이 봉투의 `caller`(이름과 세션 앞 4자, [events.md](events.md) §2)를 붙이므로, 에이전트 타임라인이 어느 에이전트의 일인지 보여 줍니다. 그 밖의 때에 낸 이벤트에 붙이려면 `emit({ …, caller })`로 직접 넘깁니다(런타임이 앞 4자로 자름).
 - 액션 하나를 등록하면 세 곳에 **자동 노출**됩니다. REST·MCP·UI에 따로 구현하지 않습니다.
   - REST: `POST /testbed/api/cores/:core/actions/:name`
   - MCP 도구: `<core>_<name>`

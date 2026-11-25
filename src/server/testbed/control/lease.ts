@@ -24,7 +24,7 @@ interface Holder {
   leaseId?: string;
 }
 
-export type ReleaseReason = 'released' | 'session-closed' | 'forced';
+export type ReleaseReason = 'released' | 'session-closed' | 'forced' | 'operation-failed';
 
 function short(id: string | undefined): string {
   return (id ?? '').slice(0, 4);
@@ -108,25 +108,38 @@ export class LeaseManager {
   /**
    * Gate for every control call. The holder's calls extend the lease. An
    * operation by anyone else while it is held is refused (and recorded); with
-   * no lease, an MCP session's first operation takes it.
+   * no lease, an MCP session's first operation takes it. Returns whether this
+   * call took the lease, so a failed operation can give it back.
    */
-  authorize(caller: Caller, fn: string, mutating: boolean): void {
+  authorize(caller: Caller, fn: string, mutating: boolean): boolean {
     if (this.holds(caller)) {
       this.extend();
-      return;
+      return false;
     }
-    if (!mutating) return;
+    if (!mutating) return false;
     if (!this.holder) {
-      if (caller.sessionId !== undefined) this.acquire(caller, fn);
-      return;
+      if (caller.sessionId === undefined) return false;
+      this.acquire(caller, fn);
+      return true;
     }
     throw this.deny(caller, fn);
   }
 
-  /** The holder gives the lease back (REST `DELETE /lease`, MCP `release_control`). */
+  /**
+   * The operation that took the lease (`authorize` returned true) failed: the
+   * lease goes back, so a refused call does not lock people out for the TTL.
+   */
+  undoAcquire(caller: Caller): void {
+    if (this.holds(caller)) this.end('operation-failed', caller.actor);
+  }
+
+  /**
+   * The holder gives the lease back (REST `DELETE /lease`, MCP
+   * `release_control`). Anyone else has nothing to give back: `false`, not a
+   * refusal — the lease stays with its holder either way.
+   */
   release(caller: Caller): boolean {
-    if (!this.holder) return false;
-    if (!this.holds(caller)) throw this.deny(caller, 'releaseLease');
+    if (!this.holder || !this.holds(caller)) return false;
     this.end('released', caller.actor);
     return true;
   }
@@ -195,10 +208,25 @@ export class LeaseManager {
       summary: `${fn} by ${caller.actor} denied: lease held by ${who} (${left} left)`,
       payload: { fn, code, caller: publicCaller(caller), lease: view },
     });
+    // An agent that reconnected (Claude Code restarted) meets the lease its
+    // old session still holds: same client name, another session.
+    const sameClient =
+      code === 'LEASE_HELD' &&
+      view?.actor === caller.actor &&
+      view.name !== undefined &&
+      view.name === caller.name &&
+      this.holder?.sessionId !== undefined &&
+      caller.sessionId !== undefined;
     const message =
       code === 'LOCKED'
-        ? `${who}이(가) 제어 중이라 조작할 수 없음(남은 시간 ${left}). 보기는 계속 가능. 제어가 끝나거나 만료되면 다시 시도`
-        : `다른 보유자가 제어 락을 가짐(${who}, 남은 시간 ${left}). 보유자가 해제하거나 만료된 뒤 다시 시도`;
-    return new TestbedError(code, message, { holder: view, remainingMs: view?.remainingMs ?? 0 });
+        ? `제어 중(${who}, 남은 시간 ${left})이라 조작할 수 없음. 보기는 계속 가능. 제어가 끝나거나 만료되면 다시 시도`
+        : sameClient
+          ? `같은 이름(${view.name})의 다른 MCP 세션(${view.holder}, 남은 시간 ${left})이 제어 락을 가짐. 다시 연결하기 전의 옛 세션이면 그 세션은 호출이 없어도 남은 시간 동안 락을 쥠. 옛 세션이 아직 열려 있으면 그쪽에서 release_control, 아니면 테스트베드 서버가 도는 곳에서 \`bun run testbed:release\`로 풀고 다시 시도`
+          : `다른 보유자가 제어 락을 가짐(${who}, 남은 시간 ${left}). 보유자가 해제하거나 만료된 뒤 다시 시도`;
+    return new TestbedError(code, message, {
+      holder: view,
+      remainingMs: view?.remainingMs ?? 0,
+      ...(sameClient ? { sameClient: true } : {}),
+    });
   }
 }

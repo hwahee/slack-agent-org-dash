@@ -10,7 +10,7 @@
 | ------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
 | `getManifest`                   | –               | 매니페스트(§6)                                                                             |
 | `getStatus`                     | –               | 코어 상태, 열린 Run, 락                                                                    |
-| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치                                                                 |
+| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치(설정에 없는 키는 `VALIDATION_ERROR`, `code: 'unknown_key'`)     |
 | `getCoreLog`                    | –               | 외부 코어의 복제별 stderr 최근 50줄(가림 적용). `replica`로 하나만. in-proc 코어는 빈 목록 |
 | `start` / `stop` / `reset`      | ●               | 코어 하나 또는 전체                                                                        |
 | `startRun` / `endRun`           | ●               | [runs-and-checks.md](runs-and-checks.md)                                                   |
@@ -24,7 +24,11 @@
 | `acquireLease` / `releaseLease` | –               | 제어 락                                                                                    |
 
 - 모든 함수는 `caller: { actor, sessionId?, leaseId?, name? }`를 받습니다. `sessionId`는 MCP 세션 id, `leaseId`는 REST로 잡은 락의 id, `name`은 표시 이름(예: MCP `clientInfo.name`)입니다.
-- 조작성 함수가 불리면 `testbed.control.invoked` 이벤트가 남습니다(함수 이름, 입력 요약, caller, 결과).
+- 조작성 함수가 불리면 `testbed.control.invoked` 이벤트가 남습니다. payload는 `{ fn, input, caller, result, error? }`입니다.
+  - `input`: 받은 입력. JSON이 2000자 이하면 값 그대로(상세 패널에서 트리로 펼침, 비밀값은 다른 payload처럼 버스가 가림), 넘으면 공통 가림 유틸로 가린 뒤의 JSON 앞 2000자에 `…`를 붙인 문자열입니다.
+  - `result`: 성공이면 `ok`, 실패면 REST·MCP가 돌려주는 것과 같은 오류 코드(`VALIDATION_ERROR`, `NOT_FOUND`, `RUN_ACTIVE` 등 §3, 그 밖의 예외는 `INTERNAL_ERROR`). summary는 `<actor> <fn> ok` 또는 `<actor> <fn> failed (<코드>)`입니다.
+  - `error`(실패만): `{ code, message?, issues? }`. `VALIDATION_ERROR`면 `issues`에 틀린 필드마다 `{ path, message, code? }`(최대 20개), 테스트베드 오류와 `NOT_FOUND`면 `message`(500자까지)가 들어갑니다. `INTERNAL_ERROR`의 문장은 서버 로그에만 남깁니다.
+- 호출자가 일으킨 이벤트(조작, check, Run 시작·종료, in-proc 코어의 액션)에는 봉투의 `caller`가 붙습니다. id는 앞 4자만 남습니다([events.md](events.md) §2).
 
 ### 1.2 이벤트 필터
 
@@ -49,7 +53,7 @@
 
 ### 2.1 MCP (에이전트)
 
-- **획득**: 에이전트의 첫 조작성 호출 때 자동으로 획득합니다. `acquire_control`로 명시적으로 얻을 수도 있습니다. 보유자는 MCP 세션 id(`Mcp-Session-Id`)와 `clientInfo.name`입니다.
+- **획득**: 에이전트의 첫 조작성 호출 때 자동으로 획득합니다. 그 호출이 실패하면(예: 사람이 연 Run 때문에 `start_run`이 `RUN_ACTIVE`) 잡은 락을 바로 놓습니다(`testbed.lease.released`, `reason: 'operation-failed'`). 이미 쥐고 있던 락은 실패해도 그대로입니다. `acquire_control`로 명시적으로 얻을 수도 있습니다. 보유자는 MCP 세션 id(`Mcp-Session-Id`)와 `clientInfo.name`입니다.
 - **유지**: 보유자가 제어면을 호출할 때마다 TTL(`TESTBED_LEASE_TTL_SEC`, 기본 600초)이 연장됩니다. 읽기 호출도 연장합니다. 호출 없이 TTL이 지나면 자동 해제되고 `testbed.lease.expired` 이벤트가 남습니다.
 - **해제**: `release_control`, MCP 세션 종료(`DELETE`), TTL 만료 중 하나.
 
@@ -68,6 +72,7 @@
 | 사람(대시보드)   | `LOCKED` (HTTP 423)     |
 
 - 오류에는 보유자(actor, 이름, 세션 id 앞 4자)와 남은 시간이 담깁니다.
+- 거절된 에이전트가 보유자와 같은 `clientInfo.name`이면(Claude Code를 재시작해 새 세션으로 다시 연결한 경우 등) `details.sameClient: true`이고, 오류 문장이 옛 세션에서 `release_control` 또는 서버 쪽 `bun run testbed:release`로 풀라고 안내합니다. 이름은 신원 증명이 아니므로 락을 자동으로 넘기지는 않습니다.
 - 읽기(상태, 이벤트, 내보내기)는 모두에게 열려 있습니다.
 - 거절될 때마다 `testbed.lease.denied` 이벤트가 남습니다.
 - 사람은 락을 잡지 않습니다. 락이 없을 때 사람은 자유롭게 조작하고, 에이전트가 조작을 시작하면 그때부터 잠깁니다.
@@ -77,7 +82,7 @@
 ### 2.4 강제 해제 — `bun run testbed:release`
 
 - 실행 중인 인스턴스의 로컬 전용 경로 `POST /testbed/internal/release`를 `127.0.0.1:$PORT`로 부릅니다. 루프백이 아닌 주소에서 오거나 `X-Forwarded-For`가 붙은 요청은 404로 거절합니다.
-- 해제는 `testbed.lease.released`(`actor: 'system'`, `payload.reason: 'forced'`)로 남습니다. 다른 해제 사유는 `released`(보유자가 해제), `session-closed`(MCP 세션 종료)입니다.
+- 해제는 `testbed.lease.released`(`actor: 'system'`, `payload.reason: 'forced'`)로 남습니다. 다른 해제 사유는 `released`(보유자가 해제), `session-closed`(MCP 세션 종료), `operation-failed`(락을 자동으로 잡은 조작이 실패함, §2.1)입니다.
 
 ## 3. REST — `/testbed/api`
 
@@ -112,6 +117,7 @@
   | `CORE_ERROR`       | 502  | 외부 코어가 자기 오류 코드로 실패함(`details.coreCode`). 프로세스가 답하기 전에 끝나면 `coreCode: 'EXITED'`. 코어가 제어면 코드(`VALIDATION_ERROR`, `CORE_NOT_RUNNING` 등)를 돌려주면 그 코드와 상태를 그대로 씀([external-core-protocol.md](external-core-protocol.md) §4.4) |
   | `CORE_TIMEOUT`     | 504  | 외부 코어가 `requestTimeoutMs` 안에 답하지 않음. 프로세스는 그대로 둠                                                                                                                                                                                                         |
 
+- `VALIDATION_ERROR`(400)의 `details`는 틀린 필드마다 `{ path, message, code, params? }`입니다. `message`는 검증 라이브러리의 영어 문장이라 사람에게 그대로 보이지 않습니다. 화면은 `code`(`too_small`, `too_big`, `invalid_type`, `invalid_value`, `unrecognized_keys`, `unknown_key`, `duplicate_id`, `no_effect`, `delay_range`, `unsupported_fault` 등)와 `params`(`origin`, `minimum`, `maximum`, `inclusive`, `expected`, `received`, `values`, `keys`, `format`, `divisor` 중 해당하는 것. `received`는 찾은 값의 JS 타입이고 빠진 필드면 `undefined`)로 자기 언어의 문장을 만듭니다(`@shared/validation`의 `ValidationIssue`).
 - 응답 모양
   - `GET /status` → `{ instanceId, cores: CoreStatus[], run: RunMeta | null, lease: LeaseView | null }`
   - `PATCH /cores/:core/config` → `{ result: 'applied' | 'restart-required', config }`
@@ -121,8 +127,9 @@
   - `POST /runs/current/end` → 닫힌 `RunMeta`(요약 포함). 열린 Run이 없으면 404 `NOT_FOUND`
   - `GET /events` → `{ events, cursor, total }`. `cursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로), `total`은 커서 뒤에서 필터에 맞는 이벤트 수(`limit`을 넘는 것 포함)입니다. 닫힌 Run을 `runId`로 지정하면 Run 저장소에서 읽습니다.
   - `POST /wait` `{ filter, count?, timeoutMs? }` → `{ events, timedOut }`. `after`가 없으면 부른 뒤부터 셉니다. 이 경로는 `Bun.serve`의 유휴 타임아웃을 끄고 받습니다(최대 120초 대기).
-  - `POST /lease` → `{ leaseId, expiresAt }`. `DELETE /lease` → `{ released }`
+  - `POST /lease` → `{ leaseId, expiresAt }`. `DELETE /lease` → `{ released }`(보유자가 아니면 오류·거절 이벤트 없이 `released: false`)
 - 오류 코드의 HTTP 상태는 `src/shared/testbed/errors.ts`의 `TESTBED_ERROR_STATUS`가 원본입니다. 없는 경로는 JSON 404입니다.
+- 오류 `message`는 에이전트가 읽는 문장입니다(도구 이름, UTC 시각). 대시보드는 이를 보이지 않고 `code`와 `details`로 사람의 문장을 만듭니다([dashboard.md](dashboard.md) §1.7). 그래서 `details`의 필드(`RUN_ACTIVE`의 `label`·`openedBy`·`startedAt`, `CORE_NOT_RUNNING`의 `core`·`replica`·`state`, 락 오류의 `holder`·`remainingMs`, `CORE_ERROR`의 `coreCode`, `CORE_TIMEOUT`의 `timeoutMs` 등)는 문장을 바꿔도 유지합니다.
 - `start_run`의 `configOverrides`는 Run이 닫힐 때(교체 포함) Run 직전 설정으로 돌아갑니다. 하나라도 재시작이 필요하면 모두 되돌리고 `RESTART_REQUIRED`입니다.
 
 ## 4. MCP — `/testbed/mcp`
@@ -168,12 +175,13 @@
 - 공통 도구는 16개입니다(`<core>_<action>` 제외).
 - **도구 주석**: 읽기 도구(`testbed_info`, `get_core_log`, `get_config`, `query_events`, `get_event`, `wait_for`, `check`, `export_run`, `mutating: false` 액션)는 `annotations.readOnlyHint: true`, 나머지는 `false`입니다.
 - **결과 형식**
-  - 성공: `content`에 사람이 읽는 짧은 텍스트(여러 줄 가능), `structuredContent`에 기계용 객체.
-  - 실패: 제어 서비스가 던진 `TestbedError`, 검증 오류(`VALIDATION_ERROR`), 없는 대상(`NOT_FOUND`)은 JSON-RPC 오류가 아니라 도구 결과 `isError: true`입니다. `content`에는 오류 문장(다음 행동을 알려 주는 문장)을, `structuredContent`에는 `{ error: { code, message, details } }`를 담습니다. 예상하지 못한 예외만 JSON-RPC 내부 오류입니다. 없는 도구 이름은 JSON-RPC `InvalidParams`입니다.
+  - 성공: `content`에 사람이 읽는 짧은 텍스트(여러 줄 가능), `structuredContent`에 기계용 객체. 문장은 오류 문장처럼 한국어로 씁니다(예: `Run run-7 'm5' 시작함(seed …)`, `제어 락을 풂`, `시간 초과: 1건 중 0건 일치`). 식별자·상태 값·이벤트 줄은 그대로 둡니다. 액션 결과는 액션의 `summarize`가 있으면 그 문장(`열린 연결이 없어 아무에게도 보내지 않음(sent: 0)`), 없으면 `<core> <action> 결과: <출력 JSON>`입니다.
+  - 실패: 제어 서비스가 던진 `TestbedError`, 검증 오류(`VALIDATION_ERROR`), 없는 대상(`NOT_FOUND`)은 JSON-RPC 오류가 아니라 도구 결과 `isError: true`입니다. `content`에는 오류 문장(다음 행동을 알려 주는 문장)을, `structuredContent`에는 `{ error: { code, message, details } }`를 담습니다. 예상하지 못한 예외만 JSON-RPC 내부 오류입니다. 없는 도구 이름은 JSON-RPC `InvalidParams`입니다. `NOT_FOUND` 문장은 코어·액션이면 실제로 있는 id를 나열하고(`core 'nope' 없음. 있는 core: sample`, `details.known`), 이벤트·Run이면 찾을 도구를 알려 줍니다.
   - 입력 검증은 SDK가 아니라 제어 서비스 쪽 검증기가 하므로 실패도 같은 형식(`VALIDATION_ERROR`)입니다. 그래서 SDK의 저수준 `Server`에 `tools/list`·`tools/call` 처리기를 직접 답니다.
 - **이벤트 한 줄 형식**(`query_events`, `wait_for`, `check`의 `content`): `<id> <HH:MM:SS.mmm> <level> <kind> <summary>`. 시각은 UTC입니다.
+- `testbed_info`의 `structuredContent.run`은 열린 Run의 메타에서 `configSnapshot`(모든 코어의 설정)을 뺀 것입니다. 설정 스냅숏은 `start_run`의 결과와 REST `GET /runs/current`에 있습니다.
 - `testbed_info`의 `content`는 이름·버전·instanceId 한 줄, 코어마다 한 줄(`sample running tcp://127.0.0.1:40001 actions: broadcast`), 열린 Run 한 줄, 락 보유자 한 줄입니다. 외부 코어 줄은 상태 뒤에 복제 수와 복제별 상태를 덧붙입니다(`py-echo running x2 (r0 running pid 123, r1 running pid 124) tcp://… actions: broadcast`).
-- `get_core_log`의 `content`는 복제마다 머리 줄(`py-echo r1 (12 lines)`)과 두 칸 들여 쓴 줄들, in-proc 코어는 `sample: in-proc 코어는 프로세스 로그가 없음`입니다.
+- `get_core_log`의 `content`는 복제마다 머리 줄(`py-echo r1 (12줄)`)과 두 칸 들여 쓴 줄들, in-proc 코어는 `sample: in-proc 코어는 프로세스 로그가 없음`입니다.
 
 ### 4.2 도구 설계 규칙
 

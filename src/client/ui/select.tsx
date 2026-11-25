@@ -13,6 +13,8 @@ interface SelectProps<V extends string> {
   /** Required: every interactive element must be automatable (docs/ui-automation.md). */
   testId: string;
   disabled?: boolean;
+  /** Validation message; wires aria-invalid + aria-describedby like TextField. */
+  error?: string;
   /** Visually hides the label (it stays available to assistive tech). */
   hideLabel?: boolean;
 }
@@ -25,9 +27,11 @@ export function Select<V extends string>({
   onChange,
   testId,
   disabled,
+  error,
   hideLabel,
 }: SelectProps<V>) {
   const id = useId();
+  const errorId = `${id}-error`;
   return (
     <div className="field">
       <label className={hideLabel ? 'visually-hidden' : 'field__label'} htmlFor={id}>
@@ -39,6 +43,8 @@ export function Select<V extends string>({
         data-testid={testId}
         value={value}
         disabled={disabled}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
         onChange={(event) => onChange(event.target.value as V)}
       >
         {options.map((option) => (
@@ -47,6 +53,11 @@ export function Select<V extends string>({
           </option>
         ))}
       </select>
+      {error && (
+        <p className="field__error" id={errorId} data-testid={`${testId}.error`}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

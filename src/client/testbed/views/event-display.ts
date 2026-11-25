@@ -18,13 +18,15 @@ export function isRedacted(value: unknown): boolean {
   return typeof value === 'string' && REDACTED.test(value);
 }
 
-/** The agent timeline: agent events, every control call and every lease change. */
+/**
+ * The agent timeline: agent events, and the control calls and lease changes
+ * of everyone but people at the dashboard (their own clicks would bury what
+ * the agents did).
+ */
 export function isAgentTimelineEvent(event: TestbedEvent): boolean {
-  return (
-    event.actor === 'agent' ||
-    event.kind.startsWith('testbed.control.') ||
-    event.kind.startsWith('testbed.lease.')
-  );
+  if (event.actor === 'agent') return true;
+  if (event.actor === 'human') return false;
+  return event.kind.startsWith('testbed.control.') || event.kind.startsWith('testbed.lease.');
 }
 
 interface CallerLike {
@@ -36,12 +38,13 @@ interface CallerLike {
 }
 
 /**
- * Who did it, as `name · ab12`: the caller of a control call or a refused
- * one, or the lease holder of a lease event. Ids are 4 characters already.
+ * Who did it, as `name · ab12`: the event's caller (control calls, checks,
+ * Run changes, core actions), else the caller in the payload (a refused
+ * call), else the lease holder of a lease event. Ids are 4 characters already.
  */
 export function callerLabel(event: TestbedEvent): string {
   const payload = (event.payload ?? {}) as { caller?: CallerLike; lease?: CallerLike | null };
-  const who = payload.caller ?? payload.lease ?? undefined;
+  const who: CallerLike | undefined = event.caller ?? payload.caller ?? payload.lease ?? undefined;
   if (!who) return event.actor;
   const name = who.name ?? who.actor ?? event.actor;
   const id = (who.sessionId ?? who.leaseId ?? who.holder ?? '').slice(0, 4);

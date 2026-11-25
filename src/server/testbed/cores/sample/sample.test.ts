@@ -259,13 +259,18 @@ describe('sample core — lifecycle', () => {
       'sample',
       'broadcast',
       { text: 'hello' },
-      { actor: 'agent' },
+      { actor: 'agent', name: 'qa-claude', sessionId: '074a9c1e-5b2d' },
     );
     expect(result).toEqual({ sent: 2 });
     expect(new TextDecoder().decode(await a.receive(5))).toBe('hello');
     expect(new TextDecoder().decode(await b.receive(5))).toBe('hello');
     const sent = await waitKind('sample.broadcast.sent');
-    expect(sent).toMatchObject({ actor: 'agent', summary: 'broadcast 5B to 2 conns' });
+    // The action's event carries its caller, ids cut to 4 characters.
+    expect(sent).toMatchObject({
+      actor: 'agent',
+      caller: { actor: 'agent', name: 'qa-claude', sessionId: '074a' },
+      summary: 'broadcast 5B to 2 conns',
+    });
   });
 
   test('broadcast validates input and needs a running core', async () => {

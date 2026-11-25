@@ -53,7 +53,6 @@ export const TESTID = {
       copyEndpoint: (core: string, name: string) =>
         `testbed.connection.copy-endpoint.${core}.${name}`,
       mcpUrl: 'testbed.connection.mcp-url',
-      copyMcpUrl: 'testbed.connection.copy-mcp-url',
       copyMcpJson: 'testbed.connection.copy-mcp-json',
       copyClaudeMd: 'testbed.connection.copy-claude-md',
     },
@@ -127,7 +126,7 @@ export const TESTID = {
       groupItem: (eventId: string) => `testbed.detail.group-item.${eventId}`,
       /** A value in the masking format, marked "redacted". */
       redacted: 'testbed.detail.redacted',
-      copyPath: (path: string) => `testbed.detail.copy-path.${path}`,
+      copyEvent: 'testbed.detail.copy-event',
     },
     eventLog: {
       root: 'testbed.event-log',
@@ -137,6 +136,8 @@ export const TESTID = {
       filter: (field: string) => `testbed.event-log.filter.${field}`,
       count: 'testbed.event-log.count',
       omitted: 'testbed.event-log.omitted',
+      /** The notice when no row is shown (no events yet, or none match). */
+      empty: 'testbed.event-log.empty',
     },
     stats: {
       root: 'testbed.stats',
@@ -157,6 +158,7 @@ export const TESTID = {
     agentTimeline: {
       root: 'testbed.agent-timeline',
       item: (eventId: string) => `testbed.agent-timeline.item.${eventId}`,
+      jumpLatest: 'testbed.agent-timeline.jump-latest',
     },
     /** Under 1024 px: the buttons that open the side columns as overlays. */
     openCores: 'testbed.open-cores',

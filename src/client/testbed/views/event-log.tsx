@@ -1,7 +1,10 @@
 /**
  * The event log tab (docs/testbed/dashboard.md §1): a virtual list with fixed
- * rows (time, level, actor, replica when any row has one, kind, summary),
- * filters kept in the address,
+ * rows (time, level, actor, replica when any row has one, kind, summary)
+ * under a row of column names, with a notice when nothing is there to show,
+ * filters kept in the address (the text inputs keep what is typed themselves
+ * and write it to the address, so fast typing and IME composition are not
+ * reset by an address that has not caught up yet),
  * following at the bottom, and the count the server's sampling left out.
  * A past Run is read over REST (`GET /events?runId=…`, page by page).
  */
@@ -51,17 +54,51 @@ function useRuns() {
   });
 }
 
+/**
+ * A text filter: the input is the source of what is typed (local state), and
+ * each change goes to the address as a patch. Reading the value back from the
+ * address would put an older value into the input while the router's update
+ * is still pending, dropping characters typed in between.
+ */
+function FilterText({
+  label,
+  initial,
+  placeholder,
+  onChange,
+  testId,
+}: {
+  label: string;
+  initial: string;
+  placeholder?: string;
+  onChange: (value: string | undefined) => void;
+  testId: string;
+}) {
+  const [draft, setDraft] = useState(initial);
+  return (
+    <TextField
+      label={label}
+      value={draft}
+      {...(placeholder === undefined ? {} : { placeholder })}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        onChange(event.target.value === '' ? undefined : event.target.value);
+      }}
+      testId={testId}
+    />
+  );
+}
+
 function Filters({
   filter,
-  setFilter,
+  set,
 }: {
   filter: LogFilter;
-  setFilter: (next: LogFilter) => void;
+  /** Merged into the address's current filter, not this render's `filter`. */
+  set: (patch: Partial<LogFilter>) => void;
 }) {
   const { t } = useI18n();
   const { status } = useTestbed();
   const runs = useRuns();
-  const set = (patch: Partial<LogFilter>) => setFilter({ ...filter, ...patch });
   const any = { value: '' as const, label: t('testbed.log.any') };
   const replicas = [
     ...new Set((status?.cores ?? []).flatMap((core) => (core.replicas ?? []).map((r) => r.id))),
@@ -93,13 +130,11 @@ function Filters({
         onChange={(core) => set({ core: core === '' ? undefined : core })}
         testId={TESTID.testbed.eventLog.filter('core')}
       />
-      <TextField
+      <FilterText
         label={t('testbed.log.kind')}
-        value={filter.kind ?? ''}
+        initial={filter.kind ?? ''}
         placeholder="sample.data"
-        onChange={(event) =>
-          set({ kind: event.target.value === '' ? undefined : event.target.value })
-        }
+        onChange={(kind) => set({ kind })}
         testId={TESTID.testbed.eventLog.filter('kind')}
       />
       <Select
@@ -131,12 +166,10 @@ function Filters({
           testId={TESTID.testbed.eventLog.filter('replica')}
         />
       )}
-      <TextField
+      <FilterText
         label={t('testbed.log.search')}
-        value={filter.text ?? ''}
-        onChange={(event) =>
-          set({ text: event.target.value === '' ? undefined : event.target.value })
-        }
+        initial={filter.text ?? ''}
+        onChange={(text) => set({ text })}
         testId={TESTID.testbed.eventLog.filter('text')}
       />
     </div>
@@ -199,6 +232,7 @@ export function EventLog() {
     count: rows.length,
   });
   const unseen = following ? 0 : Math.max(0, rows.length - seen);
+  const loading = past && pastEvents.isFetching;
 
   return (
     <div
@@ -207,8 +241,11 @@ export function EventLog() {
     >
       <Filters
         filter={filter}
-        setFilter={(next) =>
-          setParams((current) => filterToParams(next, current), { replace: true })
+        set={(patch) =>
+          setParams(
+            (current) => filterToParams({ ...filterFromParams(current), ...patch }, current),
+            { replace: true },
+          )
         }
       />
       <div className="tb-log__meta muted" role="status">
@@ -220,51 +257,66 @@ export function EventLog() {
             {t('testbed.log.omitted', { n: omitted })}
           </span>
         )}
-        {past && pastEvents.isFetching && <span>{t('common.loading')}</span>}
+        {loading && <span>{t('common.loading')}</span>}
       </div>
-      <div
-        ref={viewport}
-        className="tb-log__viewport"
-        role="list"
-        aria-label={t('testbed.tab.events')}
-        onScroll={(event) => {
-          const element = event.currentTarget;
-          setScrollTop(element.scrollTop);
-          const bottom = atBottom({
-            scrollTop: element.scrollTop,
-            viewportHeight: element.clientHeight,
-            scrollHeight: element.scrollHeight,
-            rowHeight: ROW_HEIGHT,
-          });
-          if (bottom) autoTop.current = element.scrollTop;
-          if (bottom !== following) {
-            setFollowing(bottom);
-            setSeen(rows.length);
-          }
-        }}
-      >
-        <div style={{ height: rows.length * ROW_HEIGHT, position: 'relative' }}>
-          {rows.slice(range.start, range.end).map((event, offset) => (
-            <button
-              key={event.id}
-              type="button"
-              role="listitem"
-              className="tb-log__row"
-              data-level={event.level}
-              aria-current={selected?.id === event.id || undefined}
-              style={{ top: (range.start + offset) * ROW_HEIGHT, height: ROW_HEIGHT }}
-              onClick={() => select(event)}
-              data-testid={TESTID.testbed.eventLog.row(event.id)}
-            >
-              <span className="tb-log__time">{localTime(event.ts)}</span>
-              <span className="tb-log__level">{event.level}</span>
-              <span className="tb-log__actor">{event.actor}</span>
-              {withReplica && <span className="tb-log__replica">{event.replica ?? ''}</span>}
-              <span className="tb-log__kind">{event.kind}</span>
-              <span className="tb-log__summary">{event.summary}</span>
-            </button>
-          ))}
+      <div className="tb-log__frame">
+        <div className="tb-log__head">
+          <span>{t('testbed.log.column.time')}</span>
+          <span>{t('testbed.log.column.level')}</span>
+          <span>{t('testbed.log.column.actor')}</span>
+          {withReplica && <span>{t('testbed.log.column.replica')}</span>}
+          <span>{t('testbed.log.column.kind')}</span>
+          <span>{t('testbed.log.column.summary')}</span>
         </div>
+        <div
+          ref={viewport}
+          className="tb-log__viewport"
+          role="list"
+          aria-label={t('testbed.tab.events')}
+          onScroll={(event) => {
+            const element = event.currentTarget;
+            setScrollTop(element.scrollTop);
+            const bottom = atBottom({
+              scrollTop: element.scrollTop,
+              viewportHeight: element.clientHeight,
+              scrollHeight: element.scrollHeight,
+              rowHeight: ROW_HEIGHT,
+            });
+            if (bottom) autoTop.current = element.scrollTop;
+            if (bottom !== following) {
+              setFollowing(bottom);
+              setSeen(rows.length);
+            }
+          }}
+        >
+          <div style={{ height: rows.length * ROW_HEIGHT, position: 'relative' }}>
+            {rows.slice(range.start, range.end).map((event, offset) => (
+              <button
+                key={event.id}
+                type="button"
+                role="listitem"
+                className="tb-log__row"
+                data-level={event.level}
+                aria-current={selected?.id === event.id || undefined}
+                style={{ top: (range.start + offset) * ROW_HEIGHT, height: ROW_HEIGHT }}
+                onClick={() => select(event)}
+                data-testid={TESTID.testbed.eventLog.row(event.id)}
+              >
+                <span className="tb-log__time">{localTime(event.ts)}</span>
+                <span className="tb-log__level">{event.level}</span>
+                <span className="tb-log__actor">{event.actor}</span>
+                {withReplica && <span className="tb-log__replica">{event.replica ?? ''}</span>}
+                <span className="tb-log__kind">{event.kind}</span>
+                <span className="tb-log__summary">{event.summary}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {rows.length === 0 && !loading && (
+          <p className="tb-log__empty muted" data-testid={TESTID.testbed.eventLog.empty}>
+            {t(source.length === 0 ? 'testbed.log.noEvents' : 'testbed.log.noMatch')}
+          </p>
+        )}
       </div>
       {!following && (
         <Button

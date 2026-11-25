@@ -19,9 +19,21 @@ import type { RunStore } from './store';
 const SAMPLE_SIZE = 10;
 
 export interface CheckExpectation {
-  /** `'==n'`, `'>=n'` or `'<=n'`. */
-  count?: string;
+  /** `'==n'`, `'>=n'` or `'<=n'`; a bare `n` (`'1'` or `1`) means `'==n'`. */
+  count?: string | number;
   none?: true;
+}
+
+const COUNT = /^(==|>=|<=)?(\d+)$/;
+
+/** `count` as a string or a number; a bare number means exactly that many. */
+export const countSchema = s.union([s.string().check(s.regex(COUNT)), s.int().check(s.gte(0))]);
+
+/** `'==n'`, `'>=n'`, `'<=n'` or `'none'` — what the check expected, for messages. */
+export function expectedText(expectation: CheckExpectation): string {
+  if (expectation.none) return 'none';
+  const [, op = '==', n] = COUNT.exec(String(expectation.count ?? '>=1')) ?? [];
+  return `${op}${n}`;
 }
 
 export interface CheckInput {
@@ -40,7 +52,7 @@ export interface CheckResult {
 const expectationValidator = toValidator(
   s
     .object({
-      count: s.optional(s.string().check(s.regex(/^(==|>=|<=)\d+$/))),
+      count: s.optional(countSchema),
       none: s.optional(s.literal(true)),
     })
     .check(
@@ -52,8 +64,9 @@ const expectationValidator = toValidator(
 
 function judge(matched: number, expectation: CheckExpectation): boolean {
   if (expectation.none) return matched === 0;
-  const [, op, n] = /^(==|>=|<=)(\d+)$/.exec(expectation.count ?? '>=1') ?? [];
-  const target = Number(n);
+  const expected = expectedText(expectation);
+  const op = expected.slice(0, 2);
+  const target = Number(expected.slice(2));
   if (op === '==') return matched === target;
   if (op === '<=') return matched <= target;
   return matched >= target;
@@ -88,13 +101,14 @@ export async function runCheck(
   );
   const pass = judge(matching.length, expectation);
   const label = input.label;
-  const expected = expectation.none ? 'none' : (expectation.count ?? '>=1');
+  const expected = expectedText(expectation);
 
   deps.bus.emit({
     core: 'testbed',
     kind: 'testbed.check.evaluated',
     level: pass ? 'info' : 'warn',
     actor: caller.actor,
+    caller,
     summary: `check${label === undefined ? '' : ` '${label}'`} ${pass ? 'passed' : 'failed'}: ${matching.length} matched (expected ${expected})`,
     payload: {
       ...(label === undefined ? {} : { label }),

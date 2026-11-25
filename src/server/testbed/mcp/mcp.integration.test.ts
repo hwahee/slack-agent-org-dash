@@ -9,7 +9,7 @@ import { join } from 'node:path';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { EventLine, TestbedEvent } from '@shared/testbed/events';
+import type { Caller, EventLine, TestbedEvent } from '@shared/testbed/events';
 
 import { sampleCore } from '../cores/sample';
 import { startTestServer, TcpClient, waitForEvent } from '../testing';
@@ -197,8 +197,22 @@ describe('testbed_info', () => {
     expect(result.content[0]?.text).toMatch(
       /^sample running tcp:\/\/localhost:\d+ actions: broadcast$/m,
     );
-    expect(result.content[0]?.text).toContain('run: none');
-    expect(result.content[0]?.text).toContain('lease: none');
+    expect(result.content[0]?.text).toContain('Run: 없음');
+    expect(result.content[0]?.text).toContain('제어 락: 없음');
+  });
+
+  test('an open Run is brief: no configSnapshot', async () => {
+    const { connect } = await startTestbed();
+    const agent = await connect('m5-agent');
+    const run = await agent.call<{ runId: string; configSnapshot: unknown }>('start_run', {
+      label: 'brief',
+    });
+    expect(run.configSnapshot).toBeDefined();
+    const info = (await agent.raw('testbed_info')).structuredContent as {
+      run: Record<string, unknown>;
+    };
+    expect(info.run).toMatchObject({ runId: run.runId, label: 'brief' });
+    expect(info.run).not.toHaveProperty('configSnapshot');
   });
 });
 
@@ -231,7 +245,13 @@ describe('a test session', () => {
       expect: { count: '==1' },
     });
     expect(checked.structuredContent).toMatchObject({ pass: true, matched: 1 });
-    expect(checked.content[0]?.text).toStartWith('PASS: 1 matched (expected ==1)');
+    expect(checked.content[0]?.text).toStartWith('PASS: 1건 일치(기대 ==1)');
+    // A bare number means exactly that many.
+    const bare = await agent.raw('check', {
+      filter: { kind: 'sample.data.echoed' },
+      expect: { count: '1' },
+    });
+    expect(bare.content[0]?.text).toStartWith('PASS: 1건 일치(기대 ==1)');
 
     const ended = await agent.raw('end_run');
     expect(ended.structuredContent).toMatchObject({
@@ -240,6 +260,31 @@ describe('a test session', () => {
       summary: { byKind: { 'sample.data.echoed': 1 } },
     });
     expect(ended.content[0]?.text).toContain('sample.data.echoed=1');
+  });
+
+  test("what an agent did carries its name and session's first 4 characters, so two agents tell apart", async () => {
+    const { connect, tcp, events, runtime } = await startTestbed();
+    const agent = await connect('qa-claude');
+    const short = agent.sessionId.slice(0, 4);
+    await tcp();
+    await agent.call('start_run', { label: 'who' });
+    await agent.call('sample_broadcast', { text: 'hi' });
+    await agent.call('check', { filter: { kind: 'sample.broadcast.sent' }, expect: { count: 1 } });
+    await agent.call('end_run');
+
+    const caller: Caller = { actor: 'agent', name: 'qa-claude', sessionId: short };
+    for (const kind of [
+      'testbed.control.invoked',
+      'testbed.run.started',
+      'sample.broadcast.sent',
+      'testbed.check.evaluated',
+      'testbed.run.ended',
+    ]) {
+      const [event] = events(kind);
+      expect({ kind, caller: event?.caller }).toEqual({ kind, caller });
+    }
+    // Never the whole session id: it would let anyone act as the holder.
+    expect(JSON.stringify(runtime.bus.buffered())).not.toContain(agent.sessionId);
   });
 
   test('wait_for with a cap above 120 s is cut, not refused', async () => {
@@ -301,6 +346,12 @@ describe('the lease across sessions', () => {
     expect(human.status).toBe(423);
     expect((human.body.error as ToolError).code).toBe('LOCKED');
 
+    // release_control by a session without the lease: false, no error, no denial.
+    expect(await second.call<Record<string, unknown>>('release_control')).toEqual({
+      released: false,
+    });
+    expect(events('testbed.lease.denied')).toHaveLength(2);
+
     expect(await first.call<Record<string, unknown>>('release_control')).toEqual({
       released: true,
     });
@@ -314,6 +365,23 @@ describe('the lease across sessions', () => {
       name: 'agent-two',
       holder: second.sessionId.slice(0, 4),
     });
+  });
+
+  test('an operation that took the lease and failed gives it back', async () => {
+    const { connect, rest, runtime, plane } = await startTestbed();
+    expect((await rest('POST', '/runs', { label: 'human-run' })).status).toBe(201);
+    const agent = await connect('m5-agent');
+    await agent.fail('start_run', { label: 'agent-run' }, 'RUN_ACTIVE');
+    const released = await waitForEvent(
+      runtime.bus,
+      (event) => event.kind === 'testbed.lease.released',
+    );
+    expect(released.payload).toMatchObject({ reason: 'operation-failed' });
+    expect(plane.control.lease.view()).toBeNull();
+    // A lease the session already held stays when a later call fails.
+    await agent.call('acquire_control');
+    await agent.fail('start_run', { label: 'agent-run' }, 'RUN_ACTIVE');
+    expect(plane.control.lease.view()).toMatchObject({ name: 'm5-agent' });
   });
 
   test('closing the holding session with DELETE releases the lease', async () => {
@@ -421,7 +489,8 @@ describe('events', () => {
     const echoed = all.find((event) => event.kind === 'sample.data.echoed');
     const full = await agent.call<TestbedEvent>('get_event', { id: echoed?.id });
     expect(full.payload).toMatchObject({ bytes: 5, preview: 'hello' });
-    await agent.fail('get_event', { id: 'nope:1' }, 'NOT_FOUND');
+    const noEvent = await agent.fail('get_event', { id: 'nope:1' }, 'NOT_FOUND');
+    expect(noEvent.message).toContain('query_events');
   });
 });
 
@@ -435,6 +504,17 @@ describe('actions and config', () => {
     });
     expect(new TextDecoder().decode(await client.receive(2))).toBe('hi');
     await agent.fail('sample_broadcast', { text: '' }, 'VALIDATION_ERROR');
+  });
+
+  test('a broadcast result says in words where it went, also when nowhere', async () => {
+    const { connect, tcp } = await startTestbed();
+    const agent = await connect('m5-agent');
+    const none = await agent.raw('sample_broadcast', { text: 'hi' });
+    expect(none.content[0]?.text).toBe('열린 연결이 없어 아무에게도 보내지 않음(sent: 0)');
+    expect(none.structuredContent).toEqual({ sent: 0 });
+    await tcp();
+    const one = await agent.raw('sample_broadcast', { text: 'hi' });
+    expect(one.content[0]?.text).toBe('열린 연결 1개에 보냄(sent: 1)');
   });
 
   test('set_config with an unsupported fault kind is VALIDATION_ERROR; a port change needs a restart', async () => {
@@ -452,7 +532,27 @@ describe('actions and config', () => {
     expect(await agent.call('get_config', { core: 'sample' })).toMatchObject({
       maxConnections: 5,
     });
-    await agent.fail('get_config', { core: 'nope' }, 'NOT_FOUND');
+    const missing = await agent.fail('get_config', { core: 'nope' }, 'NOT_FOUND');
+    expect(missing.message).toBe("core 'nope' 없음. 있는 core: sample");
+    expect(missing.details).toMatchObject({ known: ['sample'] });
+  });
+
+  test('set_config with a key the config does not have is VALIDATION_ERROR, and nothing changes', async () => {
+    const { connect } = await startTestbed();
+    const agent = await connect('m5-agent');
+    const before = await agent.call<Record<string, unknown>>('get_config', { core: 'sample' });
+    const error = await agent.fail(
+      'set_config',
+      { core: 'sample', patch: { eventLevl: 'debug', maxConnections: 7 } },
+      'VALIDATION_ERROR',
+    );
+    expect(error.message).toContain('eventLevl');
+    expect(error.details).toEqual([
+      expect.objectContaining({ path: 'eventLevl', code: 'unknown_key' }),
+    ]);
+    expect(await agent.call<Record<string, unknown>>('get_config', { core: 'sample' })).toEqual(
+      before,
+    );
   });
 });
 

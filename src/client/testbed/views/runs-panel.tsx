@@ -3,6 +3,8 @@
  * button, a start form (label, seed, end the open one), the past Runs and,
  * for the one picked, its summary and export link. A Run closed by someone
  * other than who opened it, or replaced / closed by a restart, says so.
+ * "End the open Run" shows only while one is open and holds for that Run
+ * only; a successful start clears the form.
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -156,26 +158,44 @@ export function RunsPanel() {
   });
   const [label, setLabel] = useState('');
   const [seed, setSeed] = useState('');
-  const [endActive, setEndActive] = useState(false);
+  /** The open Run the person ticked "end the open Run" for — another Run unticks it. */
+  const [endActiveFor, setEndActiveFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
 
   const past = (runs.data ?? []).filter((run) => run.endedAt !== undefined);
   const shown = past.find((run) => run.runId === picked) ?? null;
+  const endActive = open !== null && endActiveFor === open.runId;
 
-  async function act(fn: () => Promise<RunMeta>) {
+  async function act(fn: () => Promise<RunMeta>): Promise<boolean> {
     setBusy(true);
     setError(null);
     try {
       const run = await fn();
       if (run.endedAt !== undefined) setPicked(run.runId);
       await queryClient.invalidateQueries({ queryKey: ['testbed', 'runs'] });
+      return true;
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(errorMessage(failure, t));
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+
+  async function start() {
+    const started = await act(() =>
+      testbedApi.startRun({
+        label: label.trim(),
+        ...(seed.trim() === '' ? {} : { seed: seed.trim() }),
+        ...(endActive ? { endActive: true } : {}),
+      }),
+    );
+    if (!started) return;
+    setLabel('');
+    setSeed('');
+    setEndActiveFor(null);
   }
 
   return (
@@ -217,12 +237,14 @@ export function RunsPanel() {
           onChange={(event) => setSeed(event.target.value)}
           testId={TESTID.testbed.runs.seed}
         />
-        <Checkbox
-          label={t('testbed.runs.endActive')}
-          checked={endActive}
-          onChange={setEndActive}
-          testId={TESTID.testbed.runs.endActive}
-        />
+        {open && (
+          <Checkbox
+            label={t('testbed.runs.endActive')}
+            checked={endActive}
+            onChange={(checked) => setEndActiveFor(checked ? open.runId : null)}
+            testId={TESTID.testbed.runs.endActive}
+          />
+        )}
         <OperateButton
           loading={busy}
           onClick={() => {
@@ -230,13 +252,7 @@ export function RunsPanel() {
               setError(t('testbed.runs.labelRequired'));
               return;
             }
-            void act(() =>
-              testbedApi.startRun({
-                label: label.trim(),
-                ...(seed.trim() === '' ? {} : { seed: seed.trim() }),
-                ...(endActive ? { endActive: true } : {}),
-              }),
-            );
+            void start();
           }}
           testId={TESTID.testbed.runs.start}
         >

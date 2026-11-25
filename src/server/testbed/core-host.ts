@@ -10,15 +10,18 @@
  * in-proc ones behind the same methods; each is an `ExternalCore` that owns
  * its processes. The control service sees no difference.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type { CoreLog } from '@shared/testbed/control';
 import type { CoreKind, CoreState, CoreStatus, FaultKind } from '@shared/testbed/core';
 import type { Caller } from '@shared/testbed/events';
-import type { FaultRule } from '@shared/testbed/faults';
+import { faultRulesIssues, type FaultRule } from '@shared/testbed/faults';
 import { toJsonSchema, ValidationError, type ValidationIssue } from '@shared/validation';
 
 import type { Logger } from '../lib/log';
 import { NotFoundError } from '../lib/errors';
 import type { BaseCoreConfig, CoreContext, CoreDefinition, CoreInstance } from './core';
+import { schemaKeys, unknownConfigKeys } from './config-keys';
 import { TestbedError } from './errors';
 import type { EventBus } from './events/bus';
 import type { ExternalCoreDefinition } from './external/define';
@@ -27,6 +30,9 @@ import { FaultDecider } from './faults';
 import type { RunManager } from './runs/runs';
 
 const IN_PROC_LOG_NOTE = 'in-proc 코어는 프로세스 로그가 없음';
+
+/** The caller of the in-proc action running in this async flow. */
+const actionCaller = new AsyncLocalStorage<Caller>();
 
 const CORE_ID = /^[a-z][a-z0-9-]*$/;
 
@@ -204,7 +210,18 @@ export class CoreHost {
           throw new Error(`core '${id}' may only emit '${id}.*' kinds, got '${event.kind}'`);
         }
         if (event.level === 'debug' && hosted.config.eventLevel !== 'debug') return;
-        bus.emit({ ...event, core: id, actor: event.actor ?? 'product' });
+        // What an action does in its caller's name (the core gave the
+        // caller's actor) carries that caller, so two agents tell apart.
+        const running = actionCaller.getStore();
+        const caller =
+          event.caller ??
+          (running !== undefined && event.actor === running.actor ? running : undefined);
+        bus.emit({
+          ...event,
+          core: id,
+          actor: event.actor ?? caller?.actor ?? 'product',
+          ...(caller === undefined ? {} : { caller }),
+        });
       },
       log,
       get rng() {
@@ -321,6 +338,11 @@ export class CoreHost {
     const external = this.externals.get(id);
     if (external) return external.setConfig(patch);
     const core = this.get(id);
+    const unknown = unknownConfigKeys(
+      patch,
+      schemaKeys(toJsonSchema(core.definition.configSchema)),
+    );
+    if (unknown.length > 0) throw new ValidationError(unknown);
     const next = this.validate(core.definition, { ...core.config, ...patch });
     core.config = next;
     core.faults.setRules(next.faults);
@@ -386,6 +408,11 @@ export class CoreHost {
       })),
       faults: definition.faults ?? [],
     };
+  }
+
+  /** The action's own sentence about `output` (in-proc `summarize`), if it has one. */
+  actionResultText(id: string, name: string, output: unknown): string | undefined {
+    return this.cores.get(id)?.definition.actions?.[name]?.summarize?.(output);
   }
 
   /** Whether the action needs the lease; `undefined` for an unknown core or action. */
@@ -466,14 +493,16 @@ export class CoreHost {
     if (core.state !== 'running') {
       throw new TestbedError(
         'CORE_NOT_RUNNING',
-        `코어 ${id}가 running이 아님(${core.state}). start 후 다시 시도`,
+        `코어(${id})가 running 상태가 아님(지금 ${core.state}). start 후 다시 시도`,
         {
           core: id,
           state: core.state,
         },
       );
     }
-    return action.output.parse(await action.run(core.instance, parsed, caller));
+    return action.output.parse(
+      await actionCaller.run(caller, () => action.run(core.instance, parsed, caller)),
+    );
   }
 
   /** External cores hear about every Run change (`runChanged`, protocol §4.3). */
@@ -498,7 +527,10 @@ export class CoreHost {
 
   private validate(definition: CoreDefinition, raw: unknown): BaseCoreConfig {
     const config = definition.configSchema.parse(raw);
-    const issues = unsupportedFaults(config.faults, definition.faults ?? []);
+    const issues = [
+      ...faultRulesIssues(config.faults),
+      ...unsupportedFaults(config.faults, definition.faults ?? []),
+    ];
     if (issues.length > 0) throw new ValidationError(issues);
     return config;
   }

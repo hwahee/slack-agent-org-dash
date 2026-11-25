@@ -9,6 +9,7 @@ import {
   type Caller,
   type TestbedEvent,
 } from '@shared/testbed/events';
+import type { RunMeta } from '@shared/testbed/runs';
 import { toJsonSchema, ValidationError, type Validator } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
@@ -26,6 +27,7 @@ import {
   waitInput,
 } from '../control/inputs';
 import type { ControlService } from '../control/service';
+import { expectedText } from '../runs/check';
 import {
   coreLogText,
   coreText,
@@ -81,6 +83,14 @@ function tool<T>(definition: {
     readOnly: definition.readOnly,
     call: (input, caller) => definition.run(definition.input.parse(input ?? {}), caller),
   };
+}
+
+/** A Run for `testbed_info`: who, when, which seed — not the config snapshot. */
+function runBrief({
+  configSnapshot: _snapshot,
+  ...rest
+}: RunMeta): Omit<RunMeta, 'configSnapshot'> {
+  return rest;
 }
 
 function plain(value: unknown): Record<string, unknown> {
@@ -150,7 +160,9 @@ function commonTools(control: ControlService): McpTool[] {
             version: manifest.version,
             instanceId: manifest.instanceId,
             cores,
-            run: status.run,
+            // The Run without its configSnapshot (every core's config): that
+            // is in the Run's own record (REST GET /runs/current).
+            run: status.run === null ? null : runBrief(status.run),
             lease: status.lease,
           },
         });
@@ -178,7 +190,7 @@ function commonTools(control: ControlService): McpTool[] {
     }),
     tool({
       name: 'set_config',
-      description: `코어 설정의 부분 변경(\`patch\`의 필드만 바뀜, \`faults\`는 통째로 바뀜). 결과 \`applied\`는 바로 적용, \`restart-required\`는 저장됐고 stop → start 후 적용. 잘못된 값은 VALIDATION_ERROR.${LOCKED}`,
+      description: `코어 설정의 부분 변경(\`patch\`의 필드만 바뀜, \`faults\`는 통째로 바뀜). 결과 \`applied\`는 바로 적용, \`restart-required\`는 저장됐고 stop → start 후 적용. 잘못된 값이나 설정에 없는 키는 VALIDATION_ERROR(아무것도 바뀌지 않음).${LOCKED}`,
       input: setConfigInput,
       readOnly: false,
       run: async ({ core, patch }, caller) => {
@@ -186,8 +198,8 @@ function commonTools(control: ControlService): McpTool[] {
         return {
           text:
             out.result === 'applied'
-              ? `${core} config applied`
-              : `${core} config saved; restart-required: stop → start 하면 적용됨`,
+              ? `${core} 설정을 바로 적용함`
+              : `${core} 설정을 저장함. 재시작해야 적용됨(stop → start)`,
           structured: out,
         };
       },
@@ -216,7 +228,7 @@ function commonTools(control: ControlService): McpTool[] {
           caller,
         );
         return {
-          text: `Run ${run.runId} '${run.label}' started (seed ${run.seed})`,
+          text: `Run ${run.runId} '${run.label}' 시작함(seed ${run.seed})`,
           structured: { ...run },
         };
       },
@@ -240,7 +252,7 @@ function commonTools(control: ControlService): McpTool[] {
         const page = await control.queryEvents(filter, caller);
         const events = page.events.map(toEventLine);
         return {
-          text: `${eventLinesText(events)}\nnext cursor: ${page.cursor ?? '(none)'} · ${events.length} of ${page.total}`,
+          text: `${eventLinesText(events)}\n${events.length}/${page.total}건 · 다음 커서: ${page.cursor ?? '(없음)'}`,
           structured: { events, nextCursor: page.cursor, total: page.total },
         };
       },
@@ -275,8 +287,8 @@ function commonTools(control: ControlService): McpTool[] {
         );
         const events = out.events.map(toEventLine);
         const head = out.timedOut
-          ? `timed out: ${events.length} of ${count} matched`
-          : `matched ${events.length} of ${count}`;
+          ? `시간 초과: ${count}건 중 ${events.length}건 일치`
+          : `${count}건 중 ${events.length}건 일치`;
         return {
           text: `${head}\n${eventLinesText(events)}`,
           structured: { matched: events.length, timedOut: out.timedOut, events },
@@ -285,7 +297,7 @@ function commonTools(control: ControlService): McpTool[] {
     }),
     tool({
       name: 'check',
-      description: `판정: \`filter\`에 맞는 이벤트 수가 \`expect\`(\`count\`: '==n' | '>=n' | '<=n', 또는 \`none: true\`; 생략하면 '>=1')를 만족하는지. 대상은 \`runId\`의 Run, 생략하면 열린 Run, 없으면 링버퍼 전체. 결과는 Run 요약에 남음.${READ_ONLY}`,
+      description: `판정: \`filter\`에 맞는 이벤트 수가 \`expect\`를 만족하는지. \`count\`는 '==n' | '>=n' | '<=n'(숫자만 주면 '==n'), 또는 \`none: true\`. 생략하면 '>=1'. 대상은 \`runId\`의 Run, 생략하면 열린 Run, 없으면 링버퍼 전체. 예: \`{ filter: { kind: 'sample.data.echoed' }, expect: { count: '==1' }, label: 'echo once' }\`, \`{ filter: { level: 'error' }, expect: { none: true } }\`. 제품·코어 상태는 바꾸지 않고 락도 필요 없음. 판정마다 testbed.check.evaluated 이벤트가 남고 열린 Run 요약에 모임.`,
       input: checkInput,
       readOnly: true,
       run: async (input, caller) => {
@@ -297,10 +309,10 @@ function commonTools(control: ControlService): McpTool[] {
           },
           caller,
         );
-        const expected = input.expect.none ? 'none' : (input.expect.count ?? '>=1');
+        const expected = expectedText(input.expect);
         const label = input.label === undefined ? '' : ` '${input.label}'`;
         return {
-          text: `${out.pass ? 'PASS' : 'FAIL'}${label}: ${out.matched} matched (expected ${expected})\n${eventLinesText(out.sample)}`,
+          text: `${out.pass ? 'PASS' : 'FAIL'}${label}: ${out.matched}건 일치(기대 ${expected})\n${eventLinesText(out.sample)}`,
           structured: { ...out },
         };
       },
@@ -313,7 +325,7 @@ function commonTools(control: ControlService): McpTool[] {
       run: async ({ runId }, caller) => {
         const out = await control.exportLocation(runId, caller);
         return {
-          text: `Run ${out.runId}: ${out.url}${out.path === undefined ? '' : `\nfile: ${out.path}`}`,
+          text: `Run ${out.runId}: ${out.url}${out.path === undefined ? '' : `\n파일: ${out.path}`}`,
           structured: out,
         };
       },
@@ -327,7 +339,7 @@ function commonTools(control: ControlService): McpTool[] {
       run: (_input, caller) => {
         const { expiresAt } = control.acquireLease(caller);
         return Promise.resolve({
-          text: `lease held until ${expiresAt}; 끝나면 release_control`,
+          text: `제어 락을 가짐(${expiresAt}까지, 호출할 때마다 연장). 끝나면 release_control`,
           structured: { expiresAt },
         });
       },
@@ -335,13 +347,13 @@ function commonTools(control: ControlService): McpTool[] {
     tool({
       name: 'release_control',
       description:
-        '이 세션이 가진 제어 락을 풂. 작업이 끝나면 반드시 부름. 락이 없으면 `released: false`.',
+        '이 세션이 가진 제어 락을 풂. 작업이 끝나면 반드시 부름. 이 세션이 락을 갖고 있지 않으면(락이 없거나 다른 보유자) 오류 없이 `released: false`.',
       input: emptyInput,
       readOnly: false,
       run: (_input, caller) => {
         const out = control.releaseLease(caller);
         return Promise.resolve({
-          text: out.released ? 'lease released' : 'no lease was held',
+          text: out.released ? '제어 락을 풂' : '이 세션은 제어 락을 갖고 있지 않음(풀 것 없음)',
           structured: out,
         });
       },
@@ -389,7 +401,10 @@ function actionTools(control: ControlService): McpTool[] {
             rest = others;
           }
           const output = await control.invokeAction(core.id, action.name, rest, caller, replica);
-          return { text: JSON.stringify(output), structured: plain(output) };
+          return {
+            text: control.actionResultText(core.id, action.name, output),
+            structured: plain(output),
+          };
         },
       })),
   );
@@ -409,7 +424,16 @@ export function createTools(control: ControlService): () => Map<string, McpTool>
  * Expected failures become a tool result with `isError` and a sentence that
  * says what to do next; anything else is rethrown (JSON-RPC internal error).
  */
-export function errorResult(error: unknown): ToolResult {
+const NOT_FOUND_NEXT: Record<string, string> = {
+  event: 'query_events로 있는 이벤트 id를 확인',
+  run: 'testbed_info(열린 Run)나 REST GET /testbed/api/runs로 있는 Run id를 확인',
+};
+
+export function errorResult(
+  error: unknown,
+  /** The ids that do exist, for a NOT_FOUND message (`ControlService.knownIds`). */
+  knownIds?: (resource: string, id: string) => string[] | undefined,
+): ToolResult {
   let code: string;
   let message: string;
   let details: unknown;
@@ -421,8 +445,17 @@ export function errorResult(error: unknown): ToolResult {
     details = error.issues;
   } else if (error instanceof NotFoundError) {
     code = 'NOT_FOUND';
-    message = `${error.resource} '${error.id}' 없음. testbed_info(코어·Run)나 query_events(이벤트)로 있는 id를 확인`;
-    details = { resource: error.resource, id: error.id };
+    const known = knownIds?.(error.resource, error.id);
+    const next =
+      known === undefined
+        ? (NOT_FOUND_NEXT[error.resource] ?? 'testbed_info로 있는 id를 확인')
+        : `있는 ${error.resource}: ${known.length === 0 ? '(없음)' : known.join(', ')}`;
+    message = `${error.resource} '${error.id}' 없음. ${next}`;
+    details = {
+      resource: error.resource,
+      id: error.id,
+      ...(known === undefined ? {} : { known }),
+    };
   } else {
     throw error;
   }

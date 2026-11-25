@@ -9,7 +9,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { PanelLeft, PanelRight } from 'lucide-react';
-import { useCallback, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useState, type ComponentType } from 'react';
 
 import { testbedApi } from '../../api/endpoints';
 import { AccountControls } from '../../auth/account-controls';
@@ -75,6 +75,18 @@ function Dashboard() {
     queryFn: () => testbedApi.manifest(),
     enabled: instanceId !== undefined,
   });
+  // The browser tab carries the testbed's name, so several testbeds open side
+  // by side can be told apart.
+  const name = manifest.data?.name;
+  const documentTitle = name === undefined ? undefined : t('testbed.documentTitle', { name });
+  useEffect(() => {
+    if (documentTitle === undefined) return;
+    const previous = document.title;
+    document.title = documentTitle;
+    return () => {
+      document.title = previous;
+    };
+  }, [documentTitle]);
 
   if (snapshot.connection === 'unauthorized') return <LoginRequired />;
 

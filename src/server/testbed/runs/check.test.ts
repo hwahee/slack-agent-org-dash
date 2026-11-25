@@ -38,6 +38,11 @@ describe('check', () => {
     [{ none: true }, 2, false],
     [{}, 1, true],
     [{}, 0, false],
+    // A bare number is exactly that many, as a string or a number.
+    [{ count: '1' }, 1, true],
+    [{ count: '1' }, 2, false],
+    [{ count: 2 }, 2, true],
+    [{ count: 0 }, 1, false],
   ])(
     '%j with %d matching → pass %p, and an evaluated event each time',
     async (expectation, n, pass) => {

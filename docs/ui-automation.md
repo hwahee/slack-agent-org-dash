@@ -72,7 +72,7 @@
 | `testbed.login-required`                                                                       | 로그인이 필요할 때 대시보드 대신 보이는 안내                                                                                                    |
 | `testbed.connection`                                                                           | 연결 패널                                                                                                                                       |
 | `testbed.connection.endpoint.<core>.<name>` / `testbed.connection.copy-endpoint.<core>.<name>` | 데이터면 주소와 복사                                                                                                                            |
-| `testbed.connection.mcp-url` / `.copy-mcp-url`                                                 | 제어면 MCP URL과 복사                                                                                                                           |
+| `testbed.connection.mcp-url`                                                                   | 제어면 MCP URL(복사는 `.mcp.json` 조각으로)                                                                                                     |
 | `testbed.connection.copy-mcp-json` / `.copy-claude-md`                                         | `.mcp.json` 조각, CLAUDE.md 스니펫 복사                                                                                                         |
 | `testbed.tabs.tab.<id>` / `testbed.tabs.panel`                                                 | 주 영역 탭(`aria-selected`)과 내용                                                                                                              |
 | `testbed.core-column` / `testbed.core-card.<id>`                                               | 코어 열과 코어 카드                                                                                                                             |
@@ -83,24 +83,26 @@
 | `testbed.detail` / `.payload`                                                                  | 상세 패널과 payload 트리                                                                                                                        |
 | `testbed.detail.group` / `testbed.detail.group-item.<eventId>`                                 | 같은 correlationId 묶음과 그 항목                                                                                                               |
 | `testbed.detail.redacted`                                                                      | 가린 값(배지 "가린 값")                                                                                                                         |
-| `testbed.detail.copy-path.<path>`                                                              | 값의 경로 복사(예: `payload.bytes`)                                                                                                             |
+| `testbed.detail.copy-event`                                                                    | 고른 이벤트 전체를 JSON으로 복사. payload 트리의 각 줄은 `.tb-json__line[data-path="payload.bytes"]`                                            |
 | `testbed.event-log` / `testbed.event-log.row.<eventId>`                                        | 이벤트 로그와 행(`aria-current`가 고른 행)                                                                                                      |
 | `testbed.event-log.jump-latest`                                                                | "새 이벤트 n건 · 맨 아래로"(따라가기를 멈췄을 때만)                                                                                             |
 | `testbed.event-log.filter.<field>`                                                             | 필터(`run`, `core`, `kind`, `level`, `actor`, `replica`, `text`). `replica`는 외부 코어가 있을 때만                                             |
 | `testbed.event-log.count` / `.omitted`                                                         | 보이는 건수, 표본화로 생략된 건수                                                                                                               |
+| `testbed.event-log.empty`                                                                      | 보일 행이 없을 때의 안내(이벤트 없음 / 조건에 맞는 이벤트 없음)                                                                                 |
 | `testbed.stats` / `.sparkline` / `.latency`                                                    | 통계 탭, 초당 이벤트 수 캔버스, 지연 표                                                                                                         |
 | `testbed.runs.open` / `.start` / `.end`                                                        | 열린 Run, Run 시작·종료 버튼                                                                                                                    |
-| `testbed.runs.label` / `.seed` / `.end-active`                                                 | 시작 폼 입력                                                                                                                                    |
+| `testbed.runs.label` / `.seed` / `.end-active`                                                 | 시작 폼 입력(`.end-active`는 열린 Run이 있을 때만)                                                                                              |
 | `testbed.runs.item.<runId>` / `.summary` / `.export`                                           | 지난 Run, 고른 Run의 요약과 내보내기 링크                                                                                                       |
 | `testbed.agent-timeline` / `testbed.agent-timeline.item.<eventId>`                             | 에이전트 타임라인과 항목                                                                                                                        |
+| `testbed.agent-timeline.jump-latest`                                                           | 타임라인의 "새 이벤트 n건 · 맨 아래로"(따라가기를 멈췄을 때만)                                                                                  |
 | `testbed.open-cores` / `testbed.open-detail`                                                   | 1024px 미만에서 코어 열·상세를 여는 버튼                                                                                                        |
 | `testbed.cores-overlay` / `testbed.detail-overlay`                                             | 그때 열리는 사이드바·바텀시트(`.panel`, `.close` 파생)                                                                                          |
 
-- 락 상태는 `<html data-lease="none|agent|ci">`와 조작 컨트롤의 `aria-disabled="true"`로 관찰합니다.
+- 락 상태는 `<html data-lease="none|agent|ci">`와 조작 컨트롤의 `aria-disabled="true"`로 관찰합니다. 코어 상태에 맞지 않는 start/stop(`running` 코어의 start 등)은 락과 별개로 `disabled`입니다([testbed/dashboard.md](testbed/dashboard.md) §1.2).
 - 실시간 값은 WS로 100ms 묶음으로 들어오므로 고정 시간 대신 요소·속성의 변화를 기다립니다.
 
-`TextField`는 에러 표시 시 자동으로 `` `${testId}.error` `` 요소를 추가합니다. `TextArea`도 같고,
-힌트(글자 수 등)가 있으면 `` `${testId}.hint` ``를 더합니다.
+`TextField`는 에러 표시 시 자동으로 `` `${testId}.error` `` 요소를 추가합니다. `TextArea`와 `Select`도 같습니다.
+둘 다 힌트(글자 수, 입력 형식 등)가 있으면 `` `${testId}.hint` ``를 더합니다.
 
 `Button`은 `to`를 주면 링크(`<a>`)로 그려집니다. 이동은 링크, 동작은 버튼이므로 자동화에서도
 `getByRole('link')`로 찾습니다. 링크를 버튼으로 감싸거나 그 반대로 중첩하지 않습니다.

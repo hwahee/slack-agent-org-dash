@@ -13,12 +13,14 @@ import type {
   ReplicaStatus,
 } from '@shared/testbed/core';
 import type { Actor, Caller, EventLevel } from '@shared/testbed/events';
+import { faultRulesIssues, type FaultRule } from '@shared/testbed/faults';
 import { ValidationError, type ValidationIssue } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
 import type { Logger } from '../../lib/log';
 import { publicCaller } from '../control/caller';
 import type { BaseCoreConfig } from '../core';
+import { schemaKeys, unknownConfigKeys } from '../config-keys';
 import { TestbedError } from '../errors';
 import type { EventBus } from '../events/bus';
 import { redactText } from '../redact';
@@ -373,6 +375,11 @@ export class ExternalCore {
           },
         ]);
       }
+      const unknown = unknownConfigKeys(corePatch, [
+        ...schemaKeys(this.spec.configSchema),
+        ...GLUE_KEYS,
+      ]);
+      if (unknown.length > 0) throw new ValidationError(unknown);
       core = this.validateCore({ ...core, ...corePatch });
     }
     const replicasChanged = glue.replicas !== this.glue.replicas;
@@ -434,7 +441,7 @@ export class ExternalCore {
     if (notRunning) {
       throw new TestbedError(
         'CORE_NOT_RUNNING',
-        `코어 ${this.id}의 ${notRunning.id}가 running이 아님(${notRunning.state}). start 후 다시 시도`,
+        `코어(${this.id})의 복제(${notRunning.id})가 running 상태가 아님(지금 ${notRunning.state}). start 후 다시 시도`,
         { core: this.id, replica: notRunning.id, state: notRunning.state },
       );
     }
@@ -654,7 +661,7 @@ export class ExternalCore {
     if (!spec) throw new Error('no config schema yet');
     const config = spec.config.parse(raw) as Record<string, unknown>;
     const faults = Array.isArray(config.faults) ? (config.faults as Record<string, unknown>[]) : [];
-    const issues: ValidationIssue[] = [];
+    const issues: ValidationIssue[] = faultRulesIssues(faults as unknown as FaultRule[]);
     faults.forEach((rule, index) => {
       for (const kind of kindsOf(rule)) {
         if (!spec.faults.includes(kind)) {

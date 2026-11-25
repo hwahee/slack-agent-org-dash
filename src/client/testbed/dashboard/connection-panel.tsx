@@ -1,7 +1,8 @@
 /**
  * Where things connect (docs/testbed/dashboard.md §1): each data-plane
  * address, the control-plane MCP URL, the `.mcp.json` snippet and the
- * CLAUDE.md block for the product repository — each with a copy button.
+ * CLAUDE.md block for the product repository. The addresses and the two
+ * snippets have a copy button; the MCP URL is inside `.mcp.json` already.
  */
 import type { TestbedManifest, TestbedStatus } from '@shared/testbed/control';
 
@@ -43,14 +44,16 @@ export function ConnectionPanel({
               <span className="muted">
                 {core.id} · {endpoint.name}
               </span>
-              <code data-testid={TESTID.testbed.connection.endpoint(core.id, endpoint.name)}>
-                {endpoint.url}
-              </code>
-              <CopyButton
-                text={endpoint.url}
-                label={`${core.id} ${endpoint.name}`}
-                testId={TESTID.testbed.connection.copyEndpoint(core.id, endpoint.name)}
-              />
+              <span className="tb-connection__value">
+                <code data-testid={TESTID.testbed.connection.endpoint(core.id, endpoint.name)}>
+                  {endpoint.url}
+                </code>
+                <CopyButton
+                  text={endpoint.url}
+                  label={`${core.id} ${endpoint.name}`}
+                  testId={TESTID.testbed.connection.copyEndpoint(core.id, endpoint.name)}
+                />
+              </span>
             </li>
           )),
         )}
@@ -59,11 +62,6 @@ export function ConnectionPanel({
       <h3 className="tb-panel__subtitle">{t('testbed.connection.mcpUrl')}</h3>
       <div className="tb-connection__row">
         <code data-testid={TESTID.testbed.connection.mcpUrl}>{mcp}</code>
-        <CopyButton
-          text={mcp}
-          label={t('testbed.connection.mcpUrl')}
-          testId={TESTID.testbed.connection.copyMcpUrl}
-        />
       </div>
 
       <div className="tb-connection__snippet-head">

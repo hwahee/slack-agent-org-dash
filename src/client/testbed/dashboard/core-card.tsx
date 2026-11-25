@@ -19,6 +19,7 @@ import { ConfigEditor } from '../editing/config-editor';
 import { errorMessage } from '../editing/errors';
 import { FaultEditor } from '../editing/fault-editor';
 import { OperateButton } from '../editing/operate-button';
+import { applicableOps } from './core-ops';
 import { ReplicaTable } from './replica-table';
 import { STATE_TONE } from './state-tone';
 
@@ -32,6 +33,7 @@ export function CoreCard({ core, status }: { core: ManifestCore; status: CoreSta
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const state = status?.state ?? core.state;
+  const applicable = applicableOps(state, status);
   const module = CLIENT_CORES.find((entry) => entry.core === core.id);
   const bodyId = `tb-core-${core.id}`;
 
@@ -41,7 +43,7 @@ export function CoreCard({ core, status }: { core: ManifestCore; status: CoreSta
     try {
       await testbedApi.operate(core.id, op);
     } catch (failure) {
-      setError(errorMessage(failure));
+      setError(errorMessage(failure, t));
     } finally {
       setBusy(null);
     }
@@ -88,8 +90,9 @@ export function CoreCard({ core, status }: { core: ManifestCore; status: CoreSta
             {OPERATIONS.map((op) => (
               <OperateButton
                 key={op}
-                variant={op === 'stop' ? 'danger' : 'secondary'}
+                variant={op === 'stop' && applicable.stop ? 'danger' : 'secondary'}
                 loading={busy === op}
+                disabled={!applicable[op]}
                 onClick={() => void operate(op)}
                 testId={TESTID.testbed.coreOp[op](core.id)}
               >

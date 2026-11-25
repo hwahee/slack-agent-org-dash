@@ -22,6 +22,7 @@ interface FaultRule {
   - 한 규칙 안의 `delayMs`와 다른 효과(`error`, `disconnect`, `corrupt`)는 함께 적용됩니다. 지연 뒤에 효과가 옵니다.
 - 결함이 적용될 때마다 `testbed.fault.injected` 이벤트가 남습니다(규칙 id, 효과, `correlationId`로 원 요청과 연결).
 - 지원하는 결함 종류는 코어가 선언하고(`faults`), 스펙의 결함 표에 적습니다. 지원하지 않는 종류를 지정하면 설정 검증에서 거절합니다.
+- 스키마로 말할 수 없는 규칙 검사는 `faultRulesIssues`(`src/shared/testbed/faults.ts`)가 하고, in-proc·외부 코어 호스트가 설정을 받을 때마다 부릅니다: 규칙 `id`는 목록 안에서 겹치지 않음(`code: 'duplicate_id'`, 이벤트·판정이 규칙을 id로 구분), 규칙마다 효과(`error`·`disconnect`·`corrupt`)나 `delayMs` 중 하나는 있음(`code: 'no_effect'`), `delayMs` 범위는 `min ≤ max`(`code: 'delay_range'`).
 - 결함 주입은 코어별 선택 기능입니다. 다만 쓰는 코어는 반드시 이 형식을 따릅니다.
 - `times`로 비활성이 된 규칙은 설정에 남고, `reset`이나 설정 변경 때 횟수가 초기화됩니다.
 

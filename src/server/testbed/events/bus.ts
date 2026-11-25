@@ -1,19 +1,22 @@
 /**
  * The in-process event bus (docs/testbed/events.md §1–§4).
  *
- * `emit` fills in the envelope's common fields (seq, id, ts, runId), masks
- * secrets, caps the payload size, keeps the event in the ring buffer and
+ * `emit` fills in the envelope's common fields (seq, id, ts, runId), keeps
+ * only the first 4 characters of a caller's ids, masks secrets, caps the
+ * payload size, keeps the event in the ring buffer and
  * hands it to every subscriber (Run store, WS broadcaster, waiters).
  */
 import {
   matchesFilter,
   type Actor,
+  type Caller,
   type EventFilter,
   type EventLevel,
   type TestbedEvent,
 } from '@shared/testbed/events';
 import { nowUtc } from '@shared/time';
 
+import { publicCaller } from '../control/caller';
 import { DEFAULT_MAX_PAYLOAD_BYTES, limitPayload } from '../payload-limit';
 import { redact } from '../redact';
 import { cursorSeq, queryLimit } from './filter';
@@ -27,6 +30,8 @@ export interface EventInput<P = unknown> {
   kind: string;
   level?: EventLevel;
   actor: Actor;
+  /** The control-service caller behind it; recorded as `publicCaller` (4-character ids). */
+  caller?: Caller;
   summary: string;
   payload?: P;
   replica?: string;
@@ -77,6 +82,7 @@ export class EventBus {
       kind: input.kind,
       level: input.level ?? 'info',
       actor: input.actor,
+      ...(input.caller === undefined ? {} : { caller: publicCaller(input.caller) }),
       ...(input.correlationId === undefined ? {} : { correlationId: input.correlationId }),
       ...(input.latencyMs === undefined ? {} : { latencyMs: input.latencyMs }),
       summary: input.summary,

@@ -7,6 +7,14 @@
   box-sizing: border-box;
 }
 
+/* Korean breaks between words, not between syllables: a narrow column
+   would otherwise end a line in the middle of a word ("보입/니다").
+   break-word still breaks a word that is wider than the whole line. */
+html:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -297,7 +305,25 @@ a {
 }
 
 .tb-layout[data-wide] {
-  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr) minmax(16rem, 22rem);
+  /* Percent, not fr, for the side columns: a minmax(…, 22rem) track grows to
+     its maximum before the main area gets anything, leaving the event log a
+     sliver at 1100 px. */
+  grid-template-columns: clamp(16rem, 25%, 22rem) minmax(0, 1fr) clamp(16rem, 25%, 22rem);
+}
+
+/* Each column scrolls on its own and stays in view: a long core column (the
+   connection panel, then the config and fault editors) no longer stretches
+   the page and carries the event log and the detail panel off screen. The
+   inline padding keeps focus rings and the kids skin's glow inside the
+   scroll box's clip edge. */
+.tb-layout[data-wide] > * {
+  position: sticky;
+  top: var(--space-3);
+  max-height: calc(100vh - 2 * var(--space-3));
+  max-height: calc(100dvh - 2 * var(--space-3));
+  margin-inline: calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-2);
+  overflow-y: auto;
 }
 
 .tb-layout__main,
@@ -350,7 +376,18 @@ a {
   overflow-wrap: anywhere;
 }
 
-.tb-connection__snippet-head {
+/* An address and its copy button wrap as one: in a narrow column (or the
+   kids skin's padded code) the button stays beside the address it copies. */
+.tb-connection__value {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.tb-connection__snippet-head,
+.tb-detail__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -468,6 +505,7 @@ a {
 .tb-actions__buttons,
 .tb-faults__actions,
 .tb-faults__row-actions,
+.tb-editor__actions,
 .tb-editor__choice {
   display: flex;
   flex-wrap: wrap;
@@ -498,6 +536,12 @@ a {
   font-size: var(--font-size-sm);
 }
 
+/* Move and remove act on the whole rule: their own line, not a cell squeezed
+   between the inputs. */
+.tb-faults__row-actions {
+  grid-column: 1 / -1;
+}
+
 .tb-code[data-ok='false'] {
   color: var(--color-danger);
 }
@@ -505,6 +549,7 @@ a {
 .tb-faults__row {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  align-items: start;
   gap: var(--space-2);
   margin: 0;
   padding: var(--space-2);
@@ -524,9 +569,19 @@ a {
   gap: var(--space-2);
 }
 
+/* The start form keeps to a form's width instead of the whole main area. */
+.tb-runs__start {
+  max-width: 24rem;
+}
+
+.tb-runs__start > .btn {
+  align-self: flex-start;
+}
+
 .tb-log__filters {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  /* Wide enough for the longest option ("현재(없으면 전체)") in every skin. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
   gap: var(--space-2);
   font-size: var(--font-size-sm);
 }
@@ -538,35 +593,73 @@ a {
   font-size: var(--font-size-sm);
 }
 
-.tb-log__viewport {
-  height: 60vh;
-  min-height: 16rem;
-  overflow-y: auto;
+.tb-log__frame {
+  position: relative;
+  overflow: hidden;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 
+.tb-log__viewport {
+  height: 60vh;
+  min-height: 16rem;
+  overflow-y: auto;
+}
+
+/* The column names: the same grid as a row, above the scrolling rows. */
+.tb-log__head,
 .tb-log__row {
-  position: absolute;
-  inset-inline: 0;
   display: grid;
-  grid-template-columns: 7.5rem 3.5rem 4rem minmax(8rem, 14rem) minmax(0, 1fr);
+  /* kind by percent, not minmax(8rem, 14rem): that track would take its
+     maximum first and leave the summary nothing in a narrow main area. */
+  grid-template-columns: 7.5rem 3.5rem 4rem clamp(8rem, 30%, 14rem) minmax(0, 1fr);
   gap: var(--space-2);
   align-items: center;
   padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+.tb-log__head {
+  height: 28px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heading);
+}
+
+.tb-log__head > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Over the empty viewport, under the column names. */
+.tb-log__empty {
+  position: absolute;
+  inset: 28px 0 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  pointer-events: none;
+}
+
+.tb-log__row {
+  position: absolute;
+  inset-inline: 0;
   border: none;
   background: none;
   color: inherit;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   text-align: start;
-  white-space: nowrap;
   cursor: pointer;
 }
 
+.tb-log--replica .tb-log__head,
 .tb-log--replica .tb-log__row {
-  grid-template-columns: 7.5rem 3.5rem 4rem 2rem minmax(8rem, 14rem) minmax(0, 1fr);
+  grid-template-columns: 7.5rem 3.5rem 4rem 2rem clamp(8rem, 30%, 14rem) minmax(0, 1fr);
 }
 
 .tb-log__row > span {
@@ -653,15 +746,6 @@ a {
   gap: var(--space-1) var(--space-2);
 }
 
-.tb-json__copy {
-  opacity: 0.6;
-}
-
-.tb-json__line:hover .tb-json__copy,
-.tb-json__copy:focus-within {
-  opacity: 1;
-}
-
 .tb-json__toggle {
   display: inline-flex;
   align-items: center;
@@ -704,6 +788,11 @@ a {
   font-size: var(--font-size-sm);
   text-align: start;
   cursor: pointer;
+}
+
+.tb-timeline__viewport {
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .tb-timeline__who {
@@ -997,6 +1086,13 @@ a {
   background: var(--color-surface-raised);
 }
 
+/* Icon-only copy button (testbed CopyButton): a square that fits beside what it copies. */
+.btn[data-copy-button] {
+  flex: none;
+  width: var(--control-height);
+  padding-inline: 0;
+}
+
 /* ── Form fields ──────────────────────────────────────────────────────────── */
 .field {
   display: flex;
@@ -1061,11 +1157,6 @@ a {
   accent-color: var(--color-primary);
 }
 
-.checkbox__input:checked + .checkbox__label {
-  text-decoration: line-through;
-  color: var(--color-text-muted);
-}
-
 /* ── Badge / Alert / Spinner / Card ───────────────────────────────────────── */
 .badge {
   display: inline-block;
@@ -1091,6 +1182,7 @@ a {
 
 .alert {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -1098,8 +1190,12 @@ a {
   border: var(--border-width) solid currentcolor;
 }
 
+/* The text keeps a readable width; when the action does not fit beside it
+   (a narrow column), the action moves to its own line instead of squeezing
+   the text into one word per line. */
 .alert__body {
-  flex: 1;
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 .alert--info {

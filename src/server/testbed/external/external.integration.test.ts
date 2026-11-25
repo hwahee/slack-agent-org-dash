@@ -157,6 +157,11 @@ describe('an external core (one replica)', () => {
       faults: [{ id: 'f1', corrupt: true }],
     });
     expect(unsupported.status).toBe(400);
+    // A key neither the core's schema nor the glue has.
+    const unknown = await rest('PATCH', '/cores/fake/config', { limt: 3 });
+    expect(unknown.status).toBe(400);
+    expect(JSON.stringify(unknown.body)).toContain('unknown_key');
+    expect(control.getConfig('fake', human)).toMatchObject({ limit: 7 });
   });
 
   test('stop leaves the process alive; start runs it again with the same pid', async () => {

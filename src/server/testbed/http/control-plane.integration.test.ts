@@ -193,7 +193,7 @@ describe('operations', () => {
   });
 
   test('PATCH config: a new port → restart-required; an error fault → 400 VALIDATION_ERROR', async () => {
-    const { call } = await startTestbed({ SAMPLE_PORT: String(freePort()) });
+    const { call, events } = await startTestbed({ SAMPLE_PORT: String(freePort()) });
     const moved = await call<{ result: string }>('PATCH', '/cores/sample/config', {
       body: { port: 0 },
     });
@@ -205,6 +205,28 @@ describe('operations', () => {
     });
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe('VALIDATION_ERROR');
+
+    // The failure is recorded with the input as a value and what was wrong.
+    const failed = events('testbed.control.invoked').at(-1);
+    expect(failed).toMatchObject({
+      summary: 'human setConfig failed (VALIDATION_ERROR)',
+      payload: {
+        fn: 'setConfig',
+        input: { core: 'sample', patch: { faults: [{ id: 'f1', error: 'x' }] } },
+        result: 'VALIDATION_ERROR',
+        error: {
+          code: 'VALIDATION_ERROR',
+          issues: [expect.objectContaining({ path: 'faults.0' })],
+        },
+      },
+    });
+
+    // A secret in the input is masked like any payload field.
+    await call('PATCH', '/cores/sample/config', { body: { apiToken: 'sk-very-secret' } });
+    const masked = events('testbed.control.invoked').at(-1);
+    expect(JSON.stringify(masked)).not.toContain('sk-very-secret');
+    const input = (masked?.payload as { input: { patch: { apiToken: string } } }).input;
+    expect(input.patch.apiToken).toMatch(/^sk-v…\(len 14/);
   });
 
   test("start/stop/reset on '_all', and an action on a stopped core → 409 CORE_NOT_RUNNING", async () => {

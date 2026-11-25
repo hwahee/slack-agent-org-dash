@@ -2,7 +2,7 @@
  * The common fault-injection rule (docs/testbed/faults-and-seed.md §1) and
  * its validator, for core config schemas (`faults: s.array(faultRuleSchema)`).
  */
-import { s } from '@shared/validation';
+import { s, type ValidationIssue } from '@shared/validation';
 
 export const faultRuleSchema = s.object({
   id: s.string().check(s.minLength(1)),
@@ -33,4 +33,24 @@ export interface FaultRule {
   corrupt?: boolean;
   /** Inactive after applying this many times. */
   times?: number;
+}
+
+/**
+ * What the schema cannot say about a core's `faults` list, checked by both
+ * hosts (in-proc and external) on every config: a delay range must not run
+ * backwards.
+ */
+export function faultRulesIssues(rules: readonly FaultRule[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  rules.forEach((rule, index) => {
+    const delay = rule.delayMs;
+    if (typeof delay === 'object' && delay.min > delay.max) {
+      issues.push({
+        path: `faults.${index}.delayMs`,
+        message: `delayMs 범위의 최소값(${delay.min})이 최대값(${delay.max})보다 큼`,
+        code: 'delay_range',
+      });
+    }
+  });
+  return issues;
 }

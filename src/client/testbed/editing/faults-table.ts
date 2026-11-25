@@ -137,7 +137,9 @@ export function rowsToRules(rows: readonly FaultRow[]): {
     if (delay !== '') {
       const range = /^(\d+)\s*-\s*(\d+)$/.exec(delay);
       if (range) {
-        rule.delayMs = { min: Number(range[1]), max: Number(range[2]) };
+        const [min, max] = [Number(range[1]), Number(range[2])];
+        if (min > max) fail('delayMs', '최소값이 최대값보다 큼');
+        else rule.delayMs = { min, max };
       } else if (/^\d+$/.test(delay)) {
         rule.delayMs = Number(delay);
       } else {

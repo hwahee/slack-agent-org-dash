@@ -13,7 +13,7 @@
 import type { CoreLog } from '@shared/testbed/control';
 import type { CoreKind, CoreState, CoreStatus, FaultKind } from '@shared/testbed/core';
 import type { Caller } from '@shared/testbed/events';
-import type { FaultRule } from '@shared/testbed/faults';
+import { faultRulesIssues, type FaultRule } from '@shared/testbed/faults';
 import { toJsonSchema, ValidationError, type ValidationIssue } from '@shared/validation';
 
 import type { Logger } from '../lib/log';
@@ -504,7 +504,10 @@ export class CoreHost {
 
   private validate(definition: CoreDefinition, raw: unknown): BaseCoreConfig {
     const config = definition.configSchema.parse(raw);
-    const issues = unsupportedFaults(config.faults, definition.faults ?? []);
+    const issues = [
+      ...faultRulesIssues(config.faults),
+      ...unsupportedFaults(config.faults, definition.faults ?? []),
+    ];
     if (issues.length > 0) throw new ValidationError(issues);
     return config;
   }

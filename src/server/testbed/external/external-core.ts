@@ -13,6 +13,7 @@ import type {
   ReplicaStatus,
 } from '@shared/testbed/core';
 import type { Actor, Caller, EventLevel } from '@shared/testbed/events';
+import { faultRulesIssues, type FaultRule } from '@shared/testbed/faults';
 import { ValidationError, type ValidationIssue } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
@@ -660,7 +661,7 @@ export class ExternalCore {
     if (!spec) throw new Error('no config schema yet');
     const config = spec.config.parse(raw) as Record<string, unknown>;
     const faults = Array.isArray(config.faults) ? (config.faults as Record<string, unknown>[]) : [];
-    const issues: ValidationIssue[] = [];
+    const issues: ValidationIssue[] = faultRulesIssues(faults as unknown as FaultRule[]);
     faults.forEach((rule, index) => {
       for (const kind of kindsOf(rule)) {
         if (!spec.faults.includes(kind)) {

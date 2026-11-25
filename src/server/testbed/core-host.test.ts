@@ -36,6 +36,19 @@ describe('CoreHost', () => {
     expect(h.getConfig('sample')).toEqual(before);
   });
 
+  test('a fault rule whose delay range runs backwards is a ValidationError', async () => {
+    const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
+    h.register(sampleCore);
+    const error = await h
+      .setConfig('sample', { faults: [{ id: 'f1', delayMs: { min: 300, max: 100 } }] })
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).issues).toEqual([
+      expect.objectContaining({ path: 'faults.0.delayMs', code: 'delay_range' }),
+    ]);
+    expect(h.getConfig('sample').faults).toEqual([]);
+  });
+
   test('autoStart false: startAutoStart leaves the core idle', async () => {
     const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
     h.register(sampleCore);

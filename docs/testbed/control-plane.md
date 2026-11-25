@@ -10,7 +10,7 @@
 | ------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
 | `getManifest`                   | –               | 매니페스트(§6)                                                                             |
 | `getStatus`                     | –               | 코어 상태, 열린 Run, 락                                                                    |
-| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치                                                                 |
+| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치(설정에 없는 키는 `VALIDATION_ERROR`, `code: 'unknown_key'`)     |
 | `getCoreLog`                    | –               | 외부 코어의 복제별 stderr 최근 50줄(가림 적용). `replica`로 하나만. in-proc 코어는 빈 목록 |
 | `start` / `stop` / `reset`      | ●               | 코어 하나 또는 전체                                                                        |
 | `startRun` / `endRun`           | ●               | [runs-and-checks.md](runs-and-checks.md)                                                   |

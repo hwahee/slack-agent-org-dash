@@ -28,6 +28,14 @@ describe('CoreHost', () => {
     expect(ok.host.status('sample').state).toBe('idle');
   });
 
+  test('a config patch with a key the config does not have is a ValidationError', async () => {
+    const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
+    h.register(sampleCore);
+    const before = h.getConfig('sample');
+    await expect(h.setConfig('sample', { eventLevl: 'debug' })).rejects.toThrow(ValidationError);
+    expect(h.getConfig('sample')).toEqual(before);
+  });
+
   test('autoStart false: startAutoStart leaves the core idle', async () => {
     const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
     h.register(sampleCore);

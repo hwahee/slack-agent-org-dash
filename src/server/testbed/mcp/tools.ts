@@ -178,7 +178,7 @@ function commonTools(control: ControlService): McpTool[] {
     }),
     tool({
       name: 'set_config',
-      description: `코어 설정의 부분 변경(\`patch\`의 필드만 바뀜, \`faults\`는 통째로 바뀜). 결과 \`applied\`는 바로 적용, \`restart-required\`는 저장됐고 stop → start 후 적용. 잘못된 값은 VALIDATION_ERROR.${LOCKED}`,
+      description: `코어 설정의 부분 변경(\`patch\`의 필드만 바뀜, \`faults\`는 통째로 바뀜). 결과 \`applied\`는 바로 적용, \`restart-required\`는 저장됐고 stop → start 후 적용. 잘못된 값이나 설정에 없는 키는 VALIDATION_ERROR(아무것도 바뀌지 않음).${LOCKED}`,
       input: setConfigInput,
       readOnly: false,
       run: async ({ core, patch }, caller) => {

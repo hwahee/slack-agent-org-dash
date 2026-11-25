@@ -19,6 +19,7 @@ import { toJsonSchema, ValidationError, type ValidationIssue } from '@shared/val
 import type { Logger } from '../lib/log';
 import { NotFoundError } from '../lib/errors';
 import type { BaseCoreConfig, CoreContext, CoreDefinition, CoreInstance } from './core';
+import { schemaKeys, unknownConfigKeys } from './config-keys';
 import { TestbedError } from './errors';
 import type { EventBus } from './events/bus';
 import type { ExternalCoreDefinition } from './external/define';
@@ -321,6 +322,11 @@ export class CoreHost {
     const external = this.externals.get(id);
     if (external) return external.setConfig(patch);
     const core = this.get(id);
+    const unknown = unknownConfigKeys(
+      patch,
+      schemaKeys(toJsonSchema(core.definition.configSchema)),
+    );
+    if (unknown.length > 0) throw new ValidationError(unknown);
     const next = this.validate(core.definition, { ...core.config, ...patch });
     core.config = next;
     core.faults.setRules(next.faults);

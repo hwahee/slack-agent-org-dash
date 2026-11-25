@@ -19,6 +19,7 @@ import { NotFoundError } from '../../lib/errors';
 import type { Logger } from '../../lib/log';
 import { publicCaller } from '../control/caller';
 import type { BaseCoreConfig } from '../core';
+import { schemaKeys, unknownConfigKeys } from '../config-keys';
 import { TestbedError } from '../errors';
 import type { EventBus } from '../events/bus';
 import { redactText } from '../redact';
@@ -373,6 +374,11 @@ export class ExternalCore {
           },
         ]);
       }
+      const unknown = unknownConfigKeys(corePatch, [
+        ...schemaKeys(this.spec.configSchema),
+        ...GLUE_KEYS,
+      ]);
+      if (unknown.length > 0) throw new ValidationError(unknown);
       core = this.validateCore({ ...core, ...corePatch });
     }
     const replicasChanged = glue.replicas !== this.glue.replicas;

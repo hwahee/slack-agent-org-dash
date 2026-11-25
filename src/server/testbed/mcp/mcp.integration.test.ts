@@ -454,6 +454,24 @@ describe('actions and config', () => {
     });
     await agent.fail('get_config', { core: 'nope' }, 'NOT_FOUND');
   });
+
+  test('set_config with a key the config does not have is VALIDATION_ERROR, and nothing changes', async () => {
+    const { connect } = await startTestbed();
+    const agent = await connect('m5-agent');
+    const before = await agent.call<Record<string, unknown>>('get_config', { core: 'sample' });
+    const error = await agent.fail(
+      'set_config',
+      { core: 'sample', patch: { eventLevl: 'debug', maxConnections: 7 } },
+      'VALIDATION_ERROR',
+    );
+    expect(error.message).toContain('eventLevl');
+    expect(error.details).toEqual([
+      expect.objectContaining({ path: 'eventLevl', code: 'unknown_key' }),
+    ]);
+    expect(await agent.call<Record<string, unknown>>('get_config', { core: 'sample' })).toEqual(
+      before,
+    );
+  });
 });
 
 describe('auth and session limits', () => {

@@ -79,6 +79,11 @@ export interface ActionDefinition<I extends CoreInstance = CoreInstance> {
   surfaces?: ('rest' | 'mcp' | 'ui')[];
   /** Runs only while the core is `running`. */
   run(instance: I, input: unknown, caller: Caller): Promise<unknown>;
+  /**
+   * One Korean sentence about a result, for MCP `content` (e.g. that nothing
+   * was sent). Without it the content is the output as JSON.
+   */
+  summarize?(output: unknown): string;
 }
 
 export interface CoreDefinition<

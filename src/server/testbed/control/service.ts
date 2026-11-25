@@ -366,6 +366,14 @@ export class ControlService {
     );
   }
 
+  /** A sentence about an action's result for MCP `content` (not an operation, no lease). */
+  actionResultText(core: string, name: string, output: unknown): string {
+    return (
+      this.rt.host.actionResultText(core, name, output) ??
+      `${core} ${name} 결과: ${JSON.stringify(output)}`
+    );
+  }
+
   /**
    * For a NOT_FOUND message: the ids that do exist (`core` → core ids,
    * `action` with `<core>.<name>` → that core's actions). `undefined` when

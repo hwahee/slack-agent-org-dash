@@ -410,6 +410,11 @@ export class CoreHost {
     };
   }
 
+  /** The action's own sentence about `output` (in-proc `summarize`), if it has one. */
+  actionResultText(id: string, name: string, output: unknown): string | undefined {
+    return this.cores.get(id)?.definition.actions?.[name]?.summarize?.(output);
+  }
+
   /** Whether the action needs the lease; `undefined` for an unknown core or action. */
   actionMutating(id: string, name: string): boolean | undefined {
     const external = this.externals.get(id);

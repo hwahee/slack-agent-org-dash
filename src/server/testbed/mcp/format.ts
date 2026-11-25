@@ -20,7 +20,7 @@ export function eventLineText(line: EventLine): string {
 }
 
 export function eventLinesText(lines: readonly EventLine[]): string {
-  return lines.length === 0 ? '(no events)' : lines.map(eventLineText).join('\n');
+  return lines.length === 0 ? '(이벤트 없음)' : lines.map(eventLineText).join('\n');
 }
 
 /**
@@ -50,7 +50,7 @@ export function coreLogText(log: CoreLog): string {
   if (!log.external) return `${log.core}: ${log.note ?? ''}`;
   return log.replicas
     .map(({ replica, lines }) =>
-      [`${log.core} ${replica} (${lines.length} lines)`, ...lines.map((line) => `  ${line}`)].join(
+      [`${log.core} ${replica} (${lines.length}줄)`, ...lines.map((line) => `  ${line}`)].join(
         '\n',
       ),
     )
@@ -59,33 +59,33 @@ export function coreLogText(log: CoreLog): string {
 
 export function runText(run: RunMeta | null): string {
   return run === null
-    ? 'run: none'
-    : `run: ${run.runId} '${run.label}' (seed ${run.seed}, opened by ${run.openedBy.actor} at ${run.startedAt})`;
+    ? 'Run: 없음'
+    : `Run: ${run.runId} '${run.label}' (seed ${run.seed}, 연 쪽 ${run.openedBy.actor}, ${run.startedAt})`;
 }
 
 export function leaseText(lease: LeaseView | null): string {
-  if (lease === null) return 'lease: none';
+  if (lease === null) return '제어 락: 없음';
   const name = lease.name === undefined ? '' : ` ${lease.name}`;
-  return `lease: ${lease.actor}${name} ${lease.holder} (${minutes(lease.remainingMs)} left)`;
+  return `제어 락: ${lease.actor}${name} ${lease.holder} (남은 시간 ${minutes(lease.remainingMs)})`;
 }
 
 /** The closed Run with its summary. */
 export function endedRunText(run: RunMeta): string {
-  const lines = [`Run ${run.runId} '${run.label}' ${run.endReason ?? 'ended'}`];
+  const lines = [`Run ${run.runId} '${run.label}' 닫힘(${run.endReason ?? 'ended'})`];
   const summary = run.summary;
   if (summary) {
     const total = Object.values(summary.byKind).reduce((sum, n) => sum + n, 0);
-    lines.push(`${total} events in ${(summary.durationMs / 1000).toFixed(1)}s`);
+    lines.push(`이벤트 ${total}건, ${(summary.durationMs / 1000).toFixed(1)}초`);
     const kinds = Object.entries(summary.byKind)
       .sort(([, a], [, b]) => b - a)
       .map(([kind, n]) => `${kind}=${n}`);
-    if (kinds.length > 0) lines.push(`kinds: ${kinds.join(', ')}`);
+    if (kinds.length > 0) lines.push(`kind별: ${kinds.join(', ')}`);
     for (const error of summary.topErrors) {
-      lines.push(`error ${error.kind} ×${error.count}: ${error.summary}`);
+      lines.push(`오류 ${error.kind} ×${error.count}: ${error.summary}`);
     }
     for (const check of summary.checks) {
       lines.push(
-        `check${check.label === undefined ? '' : ` '${check.label}'`}: ${check.pass ? 'pass' : 'FAIL'} (${check.matched} matched)`,
+        `check${check.label === undefined ? '' : ` '${check.label}'`}: ${check.pass ? 'PASS' : 'FAIL'} (${check.matched}건 일치)`,
       );
     }
   }

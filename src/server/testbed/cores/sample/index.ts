@@ -320,6 +320,12 @@ export const sampleCore: CoreDefinition<SampleConfig, SampleCore> = {
       input: broadcastInput,
       output: broadcastOutput,
       mutating: true,
+      summarize: (output) => {
+        const { sent } = output as { sent: number };
+        return sent === 0
+          ? '열린 연결이 없어 아무에게도 보내지 않음(sent: 0)'
+          : `열린 연결 ${sent}개에 보냄(sent: ${sent})`;
+      },
       run: (instance, input, caller) => {
         const { text } = broadcastInput.parse(input);
         return Promise.resolve({ sent: instance.broadcast(text, caller.actor) });

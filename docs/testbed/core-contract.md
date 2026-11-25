@@ -85,6 +85,7 @@ interface ActionDefinition<I extends CoreInstance> {
   mutating: boolean; // true면 제어 락이 필요함
   surfaces?: ('rest' | 'mcp' | 'ui')[]; // 기본: 셋 다
   run(instance: I, input: unknown, caller: Caller): Promise<unknown>; // 검증된 입력으로 불림
+  summarize?(output: unknown): string; // MCP content에 쓸 결과 한 문장(한국어). 없으면 출력 JSON
 }
 ```
 

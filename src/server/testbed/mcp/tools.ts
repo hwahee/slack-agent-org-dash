@@ -198,8 +198,8 @@ function commonTools(control: ControlService): McpTool[] {
         return {
           text:
             out.result === 'applied'
-              ? `${core} config applied`
-              : `${core} config saved; restart-required: stop → start 하면 적용됨`,
+              ? `${core} 설정을 바로 적용함`
+              : `${core} 설정을 저장함. 재시작해야 적용됨(stop → start)`,
           structured: out,
         };
       },
@@ -228,7 +228,7 @@ function commonTools(control: ControlService): McpTool[] {
           caller,
         );
         return {
-          text: `Run ${run.runId} '${run.label}' started (seed ${run.seed})`,
+          text: `Run ${run.runId} '${run.label}' 시작함(seed ${run.seed})`,
           structured: { ...run },
         };
       },
@@ -252,7 +252,7 @@ function commonTools(control: ControlService): McpTool[] {
         const page = await control.queryEvents(filter, caller);
         const events = page.events.map(toEventLine);
         return {
-          text: `${eventLinesText(events)}\nnext cursor: ${page.cursor ?? '(none)'} · ${events.length} of ${page.total}`,
+          text: `${eventLinesText(events)}\n${events.length}/${page.total}건 · 다음 커서: ${page.cursor ?? '(없음)'}`,
           structured: { events, nextCursor: page.cursor, total: page.total },
         };
       },
@@ -287,8 +287,8 @@ function commonTools(control: ControlService): McpTool[] {
         );
         const events = out.events.map(toEventLine);
         const head = out.timedOut
-          ? `timed out: ${events.length} of ${count} matched`
-          : `matched ${events.length} of ${count}`;
+          ? `시간 초과: ${count}건 중 ${events.length}건 일치`
+          : `${count}건 중 ${events.length}건 일치`;
         return {
           text: `${head}\n${eventLinesText(events)}`,
           structured: { matched: events.length, timedOut: out.timedOut, events },
@@ -312,7 +312,7 @@ function commonTools(control: ControlService): McpTool[] {
         const expected = expectedText(input.expect);
         const label = input.label === undefined ? '' : ` '${input.label}'`;
         return {
-          text: `${out.pass ? 'PASS' : 'FAIL'}${label}: ${out.matched} matched (expected ${expected})\n${eventLinesText(out.sample)}`,
+          text: `${out.pass ? 'PASS' : 'FAIL'}${label}: ${out.matched}건 일치(기대 ${expected})\n${eventLinesText(out.sample)}`,
           structured: { ...out },
         };
       },
@@ -325,7 +325,7 @@ function commonTools(control: ControlService): McpTool[] {
       run: async ({ runId }, caller) => {
         const out = await control.exportLocation(runId, caller);
         return {
-          text: `Run ${out.runId}: ${out.url}${out.path === undefined ? '' : `\nfile: ${out.path}`}`,
+          text: `Run ${out.runId}: ${out.url}${out.path === undefined ? '' : `\n파일: ${out.path}`}`,
           structured: out,
         };
       },
@@ -339,7 +339,7 @@ function commonTools(control: ControlService): McpTool[] {
       run: (_input, caller) => {
         const { expiresAt } = control.acquireLease(caller);
         return Promise.resolve({
-          text: `lease held until ${expiresAt}; 끝나면 release_control`,
+          text: `제어 락을 가짐(${expiresAt}까지, 호출할 때마다 연장). 끝나면 release_control`,
           structured: { expiresAt },
         });
       },
@@ -353,7 +353,7 @@ function commonTools(control: ControlService): McpTool[] {
       run: (_input, caller) => {
         const out = control.releaseLease(caller);
         return Promise.resolve({
-          text: out.released ? 'lease released' : 'no lease was held',
+          text: out.released ? '제어 락을 풂' : '이 세션은 제어 락을 갖고 있지 않음(풀 것 없음)',
           structured: out,
         });
       },
@@ -401,7 +401,10 @@ function actionTools(control: ControlService): McpTool[] {
             rest = others;
           }
           const output = await control.invokeAction(core.id, action.name, rest, caller, replica);
-          return { text: JSON.stringify(output), structured: plain(output) };
+          return {
+            text: control.actionResultText(core.id, action.name, output),
+            structured: plain(output),
+          };
         },
       })),
   );

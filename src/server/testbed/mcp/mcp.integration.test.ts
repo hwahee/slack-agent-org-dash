@@ -197,8 +197,8 @@ describe('testbed_info', () => {
     expect(result.content[0]?.text).toMatch(
       /^sample running tcp:\/\/localhost:\d+ actions: broadcast$/m,
     );
-    expect(result.content[0]?.text).toContain('run: none');
-    expect(result.content[0]?.text).toContain('lease: none');
+    expect(result.content[0]?.text).toContain('Run: 없음');
+    expect(result.content[0]?.text).toContain('제어 락: 없음');
   });
 
   test('an open Run is brief: no configSnapshot', async () => {
@@ -245,13 +245,13 @@ describe('a test session', () => {
       expect: { count: '==1' },
     });
     expect(checked.structuredContent).toMatchObject({ pass: true, matched: 1 });
-    expect(checked.content[0]?.text).toStartWith('PASS: 1 matched (expected ==1)');
+    expect(checked.content[0]?.text).toStartWith('PASS: 1건 일치(기대 ==1)');
     // A bare number means exactly that many.
     const bare = await agent.raw('check', {
       filter: { kind: 'sample.data.echoed' },
       expect: { count: '1' },
     });
-    expect(bare.content[0]?.text).toStartWith('PASS: 1 matched (expected ==1)');
+    expect(bare.content[0]?.text).toStartWith('PASS: 1건 일치(기대 ==1)');
 
     const ended = await agent.raw('end_run');
     expect(ended.structuredContent).toMatchObject({
@@ -504,6 +504,17 @@ describe('actions and config', () => {
     });
     expect(new TextDecoder().decode(await client.receive(2))).toBe('hi');
     await agent.fail('sample_broadcast', { text: '' }, 'VALIDATION_ERROR');
+  });
+
+  test('a broadcast result says in words where it went, also when nowhere', async () => {
+    const { connect, tcp } = await startTestbed();
+    const agent = await connect('m5-agent');
+    const none = await agent.raw('sample_broadcast', { text: 'hi' });
+    expect(none.content[0]?.text).toBe('열린 연결이 없어 아무에게도 보내지 않음(sent: 0)');
+    expect(none.structuredContent).toEqual({ sent: 0 });
+    await tcp();
+    const one = await agent.raw('sample_broadcast', { text: 'hi' });
+    expect(one.content[0]?.text).toBe('열린 연결 1개에 보냄(sent: 1)');
   });
 
   test('set_config with an unsupported fault kind is VALIDATION_ERROR; a port change needs a restart', async () => {

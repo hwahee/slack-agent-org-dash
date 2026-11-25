@@ -59,11 +59,16 @@ Docker 이미지:
 
 ```bash
 docker build -t testbed-base .
-docker run --rm -p 40000:40000 testbed-base   # http://localhost:40000
+docker run --rm -p 40000-40009:40000-40009 testbed-base   # http://localhost:40000, 데이터면 40001–40009
 ```
 
 `main`에 push되면 GitHub Actions가 `check`를 통과한 뒤 이미지를 빌드해
 `ghcr.io/hwahee/testbed-base`에 `:<git sha>`와 `:latest`로 push합니다(`.github/workflows/ci.yml`의 `image` job).
+이미지는 공개 패키지라 토큰 없이 받을 수 있습니다.
+
+```bash
+docker run --rm -p 40000-40009:40000-40009 ghcr.io/hwahee/testbed-base:latest
+```
 
 ## 코드 배치
 

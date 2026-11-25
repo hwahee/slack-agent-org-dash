@@ -1,6 +1,7 @@
 /**
  * The event log tab (docs/testbed/dashboard.md §1): a virtual list with fixed
- * rows (time, level, actor, replica when any row has one, kind, summary),
+ * rows (time, level, actor, replica when any row has one, kind, summary)
+ * under a row of column names, with a notice when nothing is there to show,
  * filters kept in the address (the text inputs keep what is typed themselves
  * and write it to the address, so fast typing and IME composition are not
  * reset by an address that has not caught up yet),
@@ -231,6 +232,7 @@ export function EventLog() {
     count: rows.length,
   });
   const unseen = following ? 0 : Math.max(0, rows.length - seen);
+  const loading = past && pastEvents.isFetching;
 
   return (
     <div
@@ -255,51 +257,66 @@ export function EventLog() {
             {t('testbed.log.omitted', { n: omitted })}
           </span>
         )}
-        {past && pastEvents.isFetching && <span>{t('common.loading')}</span>}
+        {loading && <span>{t('common.loading')}</span>}
       </div>
-      <div
-        ref={viewport}
-        className="tb-log__viewport"
-        role="list"
-        aria-label={t('testbed.tab.events')}
-        onScroll={(event) => {
-          const element = event.currentTarget;
-          setScrollTop(element.scrollTop);
-          const bottom = atBottom({
-            scrollTop: element.scrollTop,
-            viewportHeight: element.clientHeight,
-            scrollHeight: element.scrollHeight,
-            rowHeight: ROW_HEIGHT,
-          });
-          if (bottom) autoTop.current = element.scrollTop;
-          if (bottom !== following) {
-            setFollowing(bottom);
-            setSeen(rows.length);
-          }
-        }}
-      >
-        <div style={{ height: rows.length * ROW_HEIGHT, position: 'relative' }}>
-          {rows.slice(range.start, range.end).map((event, offset) => (
-            <button
-              key={event.id}
-              type="button"
-              role="listitem"
-              className="tb-log__row"
-              data-level={event.level}
-              aria-current={selected?.id === event.id || undefined}
-              style={{ top: (range.start + offset) * ROW_HEIGHT, height: ROW_HEIGHT }}
-              onClick={() => select(event)}
-              data-testid={TESTID.testbed.eventLog.row(event.id)}
-            >
-              <span className="tb-log__time">{localTime(event.ts)}</span>
-              <span className="tb-log__level">{event.level}</span>
-              <span className="tb-log__actor">{event.actor}</span>
-              {withReplica && <span className="tb-log__replica">{event.replica ?? ''}</span>}
-              <span className="tb-log__kind">{event.kind}</span>
-              <span className="tb-log__summary">{event.summary}</span>
-            </button>
-          ))}
+      <div className="tb-log__frame">
+        <div className="tb-log__head">
+          <span>{t('testbed.log.column.time')}</span>
+          <span>{t('testbed.log.column.level')}</span>
+          <span>{t('testbed.log.column.actor')}</span>
+          {withReplica && <span>{t('testbed.log.column.replica')}</span>}
+          <span>{t('testbed.log.column.kind')}</span>
+          <span>{t('testbed.log.column.summary')}</span>
         </div>
+        <div
+          ref={viewport}
+          className="tb-log__viewport"
+          role="list"
+          aria-label={t('testbed.tab.events')}
+          onScroll={(event) => {
+            const element = event.currentTarget;
+            setScrollTop(element.scrollTop);
+            const bottom = atBottom({
+              scrollTop: element.scrollTop,
+              viewportHeight: element.clientHeight,
+              scrollHeight: element.scrollHeight,
+              rowHeight: ROW_HEIGHT,
+            });
+            if (bottom) autoTop.current = element.scrollTop;
+            if (bottom !== following) {
+              setFollowing(bottom);
+              setSeen(rows.length);
+            }
+          }}
+        >
+          <div style={{ height: rows.length * ROW_HEIGHT, position: 'relative' }}>
+            {rows.slice(range.start, range.end).map((event, offset) => (
+              <button
+                key={event.id}
+                type="button"
+                role="listitem"
+                className="tb-log__row"
+                data-level={event.level}
+                aria-current={selected?.id === event.id || undefined}
+                style={{ top: (range.start + offset) * ROW_HEIGHT, height: ROW_HEIGHT }}
+                onClick={() => select(event)}
+                data-testid={TESTID.testbed.eventLog.row(event.id)}
+              >
+                <span className="tb-log__time">{localTime(event.ts)}</span>
+                <span className="tb-log__level">{event.level}</span>
+                <span className="tb-log__actor">{event.actor}</span>
+                {withReplica && <span className="tb-log__replica">{event.replica ?? ''}</span>}
+                <span className="tb-log__kind">{event.kind}</span>
+                <span className="tb-log__summary">{event.summary}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {rows.length === 0 && !loading && (
+          <p className="tb-log__empty muted" data-testid={TESTID.testbed.eventLog.empty}>
+            {t(source.length === 0 ? 'testbed.log.noEvents' : 'testbed.log.noMatch')}
+          </p>
+        )}
       </div>
       {!following && (
         <Button

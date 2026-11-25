@@ -60,6 +60,14 @@ test('2. event flow: TCP data shows up in the log, and its payload in the detail
   await expect(search).toHaveValue('C-1 echoed');
   await expect(page).toHaveURL(/kind=sample\.data/);
   await expect(page).toHaveURL(/q=C-1\+echoed/);
+
+  // The columns are named, and a filter that leaves nothing says so.
+  const log = page.getByTestId(TESTID.testbed.eventLog.root);
+  await expect(log.locator('.tb-log__head')).toContainText('Summary');
+  await search.pressSequentially(' nothing like this');
+  await expect(log.getByTestId(TESTID.testbed.eventLog.empty)).toHaveText(
+    'No events match the filters.',
+  );
 });
 
 test('3. Run: start from the Run tab, data, end; the past Run summarizes it', async ({ page }) => {

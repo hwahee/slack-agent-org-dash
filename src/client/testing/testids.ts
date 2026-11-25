@@ -136,6 +136,8 @@ export const TESTID = {
       filter: (field: string) => `testbed.event-log.filter.${field}`,
       count: 'testbed.event-log.count',
       omitted: 'testbed.event-log.omitted',
+      /** The notice when no row is shown (no events yet, or none match). */
+      empty: 'testbed.event-log.empty',
     },
     stats: {
       root: 'testbed.stats',

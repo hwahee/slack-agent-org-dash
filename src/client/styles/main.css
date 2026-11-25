@@ -593,18 +593,23 @@ a {
   font-size: var(--font-size-sm);
 }
 
-.tb-log__viewport {
-  height: 60vh;
-  min-height: 16rem;
-  overflow-y: auto;
+.tb-log__frame {
+  position: relative;
+  overflow: hidden;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 
+.tb-log__viewport {
+  height: 60vh;
+  min-height: 16rem;
+  overflow-y: auto;
+}
+
+/* The column names: the same grid as a row, above the scrolling rows. */
+.tb-log__head,
 .tb-log__row {
-  position: absolute;
-  inset-inline: 0;
   display: grid;
   /* kind by percent, not minmax(8rem, 14rem): that track would take its
      maximum first and leave the summary nothing in a narrow main area. */
@@ -612,16 +617,47 @@ a {
   gap: var(--space-2);
   align-items: center;
   padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+.tb-log__head {
+  height: 28px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heading);
+}
+
+.tb-log__head > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Over the empty viewport, under the column names. */
+.tb-log__empty {
+  position: absolute;
+  inset: 28px 0 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  pointer-events: none;
+}
+
+.tb-log__row {
+  position: absolute;
+  inset-inline: 0;
   border: none;
   background: none;
   color: inherit;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   text-align: start;
-  white-space: nowrap;
   cursor: pointer;
 }
 
+.tb-log--replica .tb-log__head,
 .tb-log--replica .tb-log__row {
   grid-template-columns: 7.5rem 3.5rem 4rem 2rem clamp(8rem, 30%, 14rem) minmax(0, 1fr);
 }

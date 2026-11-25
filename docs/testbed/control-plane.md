@@ -98,14 +98,16 @@
 
 - 오류는 보일러플레이트의 에러 엔벨로프(`src/shared/api/errors.ts`)를 따릅니다. 추가 코드:
 
-  | 코드               | HTTP | 뜻                                                                                                                                                            |
-  | ------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `LOCKED`           | 423  | 에이전트·CI가 제어 중이라 사람의 조작 거절                                                                                                                    |
-  | `LEASE_HELD`       | 409  | 다른 보유자가 락을 가짐                                                                                                                                       |
-  | `RUN_ACTIVE`       | 409  | 이미 열린 Run이 있음                                                                                                                                          |
-  | `CORE_NOT_RUNNING` | 409  | 코어가 `running`이 아님                                                                                                                                       |
-  | `RESTART_REQUIRED` | 409  | `start_run`의 `configOverrides`처럼 즉시 적용돼야 하는 설정이 재시작을 요구함. `PATCH /config`는 오류가 아니라 200 응답의 `result: 'restart-required'`로 알림 |
-  | `CURSOR_STALE`     | 410  | 다른 인스턴스의 커서                                                                                                                                          |
+  | 코드               | HTTP | 뜻                                                                                                                                                                                                                                                                            |
+  | ------------------ | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `LOCKED`           | 423  | 에이전트·CI가 제어 중이라 사람의 조작 거절                                                                                                                                                                                                                                    |
+  | `LEASE_HELD`       | 409  | 다른 보유자가 락을 가짐                                                                                                                                                                                                                                                       |
+  | `RUN_ACTIVE`       | 409  | 이미 열린 Run이 있음                                                                                                                                                                                                                                                          |
+  | `CORE_NOT_RUNNING` | 409  | 코어가 `running`이 아님                                                                                                                                                                                                                                                       |
+  | `RESTART_REQUIRED` | 409  | `start_run`의 `configOverrides`처럼 즉시 적용돼야 하는 설정이 재시작을 요구함. `PATCH /config`는 오류가 아니라 200 응답의 `result: 'restart-required'`로 알림                                                                                                                 |
+  | `CURSOR_STALE`     | 410  | 다른 인스턴스의 커서                                                                                                                                                                                                                                                          |
+  | `CORE_ERROR`       | 502  | 외부 코어가 자기 오류 코드로 실패함(`details.coreCode`). 프로세스가 답하기 전에 끝나면 `coreCode: 'EXITED'`. 코어가 제어면 코드(`VALIDATION_ERROR`, `CORE_NOT_RUNNING` 등)를 돌려주면 그 코드와 상태를 그대로 씀([external-core-protocol.md](external-core-protocol.md) §4.4) |
+  | `CORE_TIMEOUT`     | 504  | 외부 코어가 `requestTimeoutMs` 안에 답하지 않음. 프로세스는 그대로 둠                                                                                                                                                                                                         |
 
 - 응답 모양
   - `GET /status` → `{ instanceId, cores: CoreStatus[], run: RunMeta | null, lease: LeaseView | null }`

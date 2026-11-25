@@ -62,7 +62,7 @@ export class McpEndpoint {
   private readonly sessions = new Map<string, Session>();
   /** `initialize` requests not answered yet — they count toward the cap. */
   private opening = 0;
-  private readonly tools: Map<string, McpTool>;
+  private readonly tools: () => Map<string, McpTool>;
   private readonly idleMs: number;
 
   constructor(private readonly options: McpEndpointOptions) {
@@ -156,7 +156,7 @@ export class McpEndpoint {
       { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS },
     );
     server.setRequestHandler(ListToolsRequestSchema, () => ({
-      tools: [...this.tools.values()].map((entry) => ({
+      tools: [...this.tools().values()].map((entry) => ({
         name: entry.name,
         description: entry.description,
         inputSchema: entry.inputSchema as { type: 'object' },
@@ -164,7 +164,7 @@ export class McpEndpoint {
       })),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      const entry = this.tools.get(request.params.name);
+      const entry = this.tools().get(request.params.name);
       if (!entry) {
         throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
       }

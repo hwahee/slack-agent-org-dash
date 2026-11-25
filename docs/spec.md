@@ -6,6 +6,7 @@
 
 | 날짜       | 바뀐 절                                                                                                                                                                                                                                                                    | 영향받는 마일스톤 |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 2026-11-25 | 2절: M11 결과(JSON Schema → 검증기는 zod `fromJSONSchema`, 라이브러리 추가 없음)                                                                                                                                                                                           | M11               |
 | 2026-11-25 | 11절: P4(M11–M14 외부 프로세스 코어, 감시·복제, Python 참조 구현, 표면 반영) 추가. 3절(예제 코어), 12절 갱신. `testbed/external-core-protocol.md` 개정(initialize에서 설정 분리, 설정 필드, 오류 변환, 감시 이벤트, 언어 간 재현성), `testbed/ports.md`에 40002–40008 등록 | M11–M14           |
 | 2026-11-24 | 11절: P2(M5–M6 MCP 어댑터, 스모크)와 P3(M7–M10 대시보드, UI 자동화) 추가. 10절, 12절, 13절 갱신(13절 1번은 M1 성공으로 삭제)                                                                                                                                               | M5–M10            |
 | 2026-11-24 | 2절: M1 결과(MCP SDK 1.32.2, 웹 표준 전송을 `Bun.serve`에 바로 붙임)                                                                                                                                                                                                       | M1, P2            |
@@ -33,6 +34,11 @@
   `onsessionclosed`에서 제거). 세션 없는 요청은 `initialize`만 받고, 끝난 세션의 요청은 404입니다. 도구 입력
   스키마는 `@shared/validation`의 `s`(zod/mini)를 그대로 씁니다. JSON 응답(`enableJsonResponse`)과 기본 SSE 응답
   모두 확인했습니다(`src/server/testbed/mcp/mcp-sdk.integration.test.ts`).
+- **JSON Schema → 검증기 (M11 결과)**: 라이브러리를 추가하지 않고 zod 4.6.5의 `fromJSONSchema`를 씁니다.
+  `@shared/validation`의 `fromJsonSchema(schema)`가 이를 감싸고, zod가 거르지 않는 모양 오류(`properties`가 객체가
+  아님, JSON Schema 키워드가 없음 등)는 앞에서 얕게 검사합니다. 범위(`minimum`·`maximum`), `enum`, `required`,
+  `integer`, `anyOf`, `additionalProperties: false`가 검증되는 것을 확인했습니다
+  (`src/shared/validation/validation.test.ts`). `toJsonSchema`는 받은 스키마를 그대로 돌려줍니다(매니페스트 노출용).
 
 ## 3. 구성
 

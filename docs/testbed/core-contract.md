@@ -2,6 +2,8 @@
 
 코어는 테스트베드의 실제 기능입니다. 기본은 Bun 프로세스 안에서 도는 **in-proc 코어**이고, 그 밖의 경우는 [external-core-protocol.md](external-core-protocol.md)를 따릅니다.
 
+> 외부 프로세스 코어는 `defineExternalCore`(`src/server/testbed/external/define.ts`)로 선언해 같은 `CORES` 목록에 넣습니다. 설정 스키마·액션·결함 종류는 프로세스가 `initialize`로 알립니다([external-core-protocol.md](external-core-protocol.md) §2, §4.1).
+
 ## 1. 정의
 
 정의는 `src/server/testbed/core.ts`에 있고, 상태·엔드포인트처럼 대시보드도 보는 타입은 `src/shared/testbed/core.ts`에 있습니다. 코어 호스트는 `src/server/testbed/core-host.ts`, 이 테스트베드의 코어 목록은 `src/server/testbed/cores/index.ts`(`CORES`)입니다.

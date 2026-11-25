@@ -23,4 +23,4 @@ export {
   type Validator,
   type Infer,
 } from './core';
-export { s, toJsonSchema, toValidator } from './zod-adapter';
+export { fromJsonSchema, s, toJsonSchema, toValidator } from './zod-adapter';

@@ -342,10 +342,14 @@ function actionTools(control: ControlService): McpTool[] {
   );
 }
 
-export function createTools(control: ControlService): Map<string, McpTool> {
-  return new Map(
-    [...commonTools(control), ...actionTools(control)].map((entry) => [entry.name, entry]),
-  );
+/**
+ * The tools of the moment. The common ones never change; action tools are
+ * read from the manifest on every call, because an external core's actions
+ * are known only once its process has initialized (and can change on restart).
+ */
+export function createTools(control: ControlService): () => Map<string, McpTool> {
+  const common = commonTools(control);
+  return () => new Map([...common, ...actionTools(control)].map((entry) => [entry.name, entry]));
 }
 
 /**

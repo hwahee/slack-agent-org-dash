@@ -160,5 +160,10 @@ stop → (프로세스는 살아 있음) → start …
 
 ## 10. 참조 구현
 
-- `examples/python-core/`: Python 어댑터(`testbed_core`)와 예제 코어 `py-echo`. Python 3.11 이상, 표준 라이브러리만 씁니다.
+- `examples/python-core/`: Python 어댑터(`testbed_core`)와 예제 코어 `py-echo`. Python 3.11 이상, 표준 라이브러리만(`asyncio`) 씁니다. 자세한 사용법은 [examples/python-core/README.md](../../examples/python-core/README.md).
+  - 코어는 `testbed_core.Core`를 상속해 `kind`, `title`, `faults`, `config_schema`(자기 필드만), `actions`(`Action(title, description, input_schema, output_schema, handler, mutating=True)`), `default_config(env)`, `start`/`stop`/`reset`/`apply_config`/`status`를 정하고 `run(MyCore())`를 부릅니다.
+  - 어댑터가 맡는 것: NDJSON JSON-RPC 처리(요청마다 작업 하나, 느린 액션이 `status`를 막지 않음), 공통 필드(`autoStart`, `eventLevel`, `faults`)를 스키마와 기본값에 넣기, `running`이 아닐 때의 `applyConfig` 저장, seed를 받을 때마다 `SeededRng` 새로 만들기와 결함 횟수 초기화, `shutdown`.
+  - 코어가 쓰는 것(`self.ctx`): `emit(kind, summary, payload, level=, correlation_id=, latency_ms=, actor=)`, `state()`, `log()`, `decide(selector, correlation_id)`(적용하면 `fault` 알림까지), `rng`, `config`, `replica_id`·`replica_index`, `env`.
+  - 오류: `CoreError(code, message, details)`는 그 코드로, 그 밖의 예외는 `data.code: 'INTERNAL'`로 돌려주고 stderr에 traceback을 씁니다. 프로세스는 끝나지 않습니다.
+  - 선언은 `examples/python-core/index.ts`(`defineExternalCore`, 명령 `python3 -u examples/python-core/echo_core.py`)이고, `TESTBED_EXAMPLE_CORES=py-echo`로 켭니다([architecture.md](architecture.md) §7).
 - 다른 언어는 필요해질 때 추가합니다.

@@ -24,3 +24,6 @@ test-results/
 
 # Testbed Run store (TESTBED_RUN_STORE=file, TESTBED_DATA_DIR)
 data/
+
+# Python (examples/python-core)
+__pycache__/

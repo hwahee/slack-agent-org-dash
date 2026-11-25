@@ -1,14 +1,19 @@
 /**
- * Finds the scenario files: `src/server/testbed/cores/<core>/smoke/*.smoke.ts`,
- * each default-exporting `defineSmoke({...})`. Testbed repositories add them
- * under `cores/` only, so the common runtime never changes for them.
+ * Finds the scenario files: `src/server/testbed/cores/<core>/smoke/*.smoke.ts`
+ * and `examples/<example>/smoke/*.smoke.ts`, each default-exporting
+ * `defineSmoke({...})`. Testbed repositories add them under `cores/` only, so
+ * the common runtime never changes for them.
  */
 import { join, relative } from 'node:path';
 
 import type { SmokeDefinition } from './index';
 import type { LoadedScenario } from './runner';
 
-const SCENARIO_GLOB = 'src/server/testbed/cores/*/smoke/*.smoke.ts';
+const SCENARIO_GLOBS = [
+  'src/server/testbed/cores/*/smoke/*.smoke.ts',
+  // The example cores' (they SKIP unless TESTBED_EXAMPLE_CORES turns the core on).
+  'examples/*/smoke/*.smoke.ts',
+];
 
 /** The repository root (this file is `src/server/testbed/smoke/load.ts`). */
 export const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..');
@@ -23,7 +28,9 @@ function isDefinition(value: unknown): value is SmokeDefinition {
 }
 
 export async function loadScenarios(root = REPO_ROOT): Promise<LoadedScenario[]> {
-  const files = [...new Bun.Glob(SCENARIO_GLOB).scanSync({ cwd: root, absolute: true })].sort();
+  const files = SCENARIO_GLOBS.flatMap((glob) =>
+    [...new Bun.Glob(glob).scanSync({ cwd: root, absolute: true })].sort(),
+  );
   const scenarios: LoadedScenario[] = [];
   for (const path of files) {
     const module = (await import(path)) as { default?: unknown };

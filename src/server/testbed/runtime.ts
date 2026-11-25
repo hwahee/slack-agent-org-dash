@@ -12,6 +12,7 @@ import { LeaseManager } from './control/lease';
 import { ControlService } from './control/service';
 import { CoreHost, type AnyCoreDefinition } from './core-host';
 import { EventBus } from './events/bus';
+import { exampleCores } from './examples';
 import type { TestbedHttp } from './http/routes';
 import { TestbedSocketHub } from './http/ws';
 import { McpEndpoint } from './mcp/endpoint';
@@ -58,7 +59,7 @@ export async function createTestbedRuntime(options: {
     ...(cwd === undefined ? {} : { cwd }),
     ...(externalTiming === undefined ? {} : { externalTiming }),
   });
-  for (const core of cores) host.register(core);
+  for (const core of [...cores, ...exampleCores(config.exampleCores)]) host.register(core);
   return { bus, store, runs, host };
 }
 

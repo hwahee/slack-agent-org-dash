@@ -1,7 +1,7 @@
 /**
  * MCP smoke scenarios (docs/testbed/verification.md §2): what a scenario file
  * imports. A scenario lives in `src/server/testbed/cores/<core>/smoke/*.smoke.ts`
- * and default-exports `defineSmoke({...})`; `bun run testbed:smoke` finds and
+ * (an example core's in `examples/<example>/smoke/*.smoke.ts`) and default-exports `defineSmoke({...})`; `bun run testbed:smoke` finds and
  * runs it against a live instance over MCP, REST and the data plane.
  */
 import type { EventFilter } from '@shared/testbed/events';
@@ -14,7 +14,9 @@ export interface SmokeManifest {
   cores: {
     id: string;
     state: string;
-    endpoints: { name: string; protocol: string; url: string }[];
+    /** The configured replica count (1 for in-proc cores). */
+    replicas: number;
+    endpoints: { name: string; protocol: string; url: string; replica?: string }[];
     actions: { name: string; mutating: boolean; surfaces: string[] }[];
   }[];
   auth: { control: 'none' | 'bearer' };

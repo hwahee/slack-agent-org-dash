@@ -56,7 +56,7 @@ const brokenEcho = defineSmoke({
 });
 
 describe('runSmoke', () => {
-  test('the shipped scenarios: common check and 4 scenarios PASS, coverage PASS', async () => {
+  test('the shipped scenarios: common check and 4 scenarios PASS, py-echo SKIP (not turned on), coverage PASS', async () => {
     const { base } = await startTestbed();
     const scenarios = await loadScenarios();
     expect(scenarios.map((scenario) => scenario.file)).toEqual([
@@ -64,10 +64,12 @@ describe('runSmoke', () => {
       'src/server/testbed/cores/sample/smoke/sample-echo.smoke.ts',
       'src/server/testbed/cores/sample/smoke/sample-faults.smoke.ts',
       'src/server/testbed/cores/sample/smoke/sample-run-replace.smoke.ts',
+      'examples/python-core/smoke/py-echo.smoke.ts',
     ]);
     const { report, lines } = await smoke(base, scenarios);
     expect(report.common.status).toBe('PASS');
     expect(status(report)).toEqual({
+      'py-echo': 'SKIP',
       'sample-broadcast': 'PASS',
       'sample-echo': 'PASS',
       'sample-faults': 'PASS',
@@ -79,7 +81,8 @@ describe('runSmoke', () => {
       missing: [],
     });
     expect(report.ok).toBe(true);
-    expect(lines.at(-1)).toBe('total: 5 pass, 0 fail, 0 skip; coverage PASS');
+    expect(lines).toContain('SKIP py-echo (0ms) — requires core py-echo');
+    expect(lines.at(-1)).toBe('total: 5 pass, 0 fail, 1 skip; coverage PASS');
   }, 30_000);
 
   test('a failing scenario: FAIL with step and message, the rest still run, its Run and lease cleaned up', async () => {
@@ -138,7 +141,7 @@ describe('runSmoke', () => {
       (scenario) => scenario.definition.name !== 'sample-broadcast',
     );
     const { report, lines } = await smoke(base, scenarios);
-    expect(report.scenarios.every((result) => result.status === 'PASS')).toBe(true);
+    expect(report.scenarios.every((result) => result.status !== 'FAIL')).toBe(true);
     expect(report.coverage).toMatchObject({ status: 'FAIL', missing: ['sample_broadcast'] });
     expect(lines).toContain('FAIL coverage — not called by any scenario: sample_broadcast');
     expect(report.ok).toBe(false);
@@ -195,6 +198,7 @@ describe('bun run testbed:smoke', () => {
     expect(json.exitCode).toBe(0);
     expect(json.common.status).toBe('PASS');
     expect(json.scenarios.map((result) => [result.name, result.status])).toEqual([
+      ['py-echo', 'SKIP'],
       ['sample-broadcast', 'PASS'],
       ['sample-echo', 'PASS'],
       ['sample-faults', 'PASS'],
@@ -208,7 +212,7 @@ describe('bun run testbed:smoke', () => {
     const child = cli(['--url', base]);
     expect(await child.exited).toBe(0);
     const stdout = await new Response(child.stdout).text();
-    expect(stdout).toContain('total: 5 pass, 0 fail, 0 skip; coverage PASS');
+    expect(stdout).toContain('total: 5 pass, 0 fail, 1 skip; coverage PASS');
   }, 60_000);
 
   test('nothing answering at --url is exit 2', async () => {

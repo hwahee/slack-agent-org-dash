@@ -20,6 +20,8 @@ const testbedConfigValidator = toValidator(
     mcpMaxSessions: s.int().check(s.gte(1)),
     /** An MCP session with no requests for this long is closed by the server. */
     mcpSessionIdleSec: s.int().check(s.gte(1)),
+    /** `TESTBED_EXAMPLE_CORES`: example cores under `examples/` to register too. */
+    exampleCores: s.array(s.string().check(s.minLength(1))),
   }),
 );
 
@@ -50,5 +52,9 @@ export function loadTestbedConfig(
     leaseTtlSec: intOr(env.TESTBED_LEASE_TTL_SEC, 600),
     mcpMaxSessions: intOr(env.TESTBED_MCP_MAX_SESSIONS, 32),
     mcpSessionIdleSec: intOr(env.TESTBED_MCP_SESSION_IDLE_SEC, 3600),
+    exampleCores: (env.TESTBED_EXAMPLE_CORES ?? '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
   });
 }

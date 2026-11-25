@@ -122,7 +122,7 @@
   - `POST /runs/current/end` → 닫힌 `RunMeta`(요약 포함). 열린 Run이 없으면 404 `NOT_FOUND`
   - `GET /events` → `{ events, cursor, total }`. `cursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로), `total`은 커서 뒤에서 필터에 맞는 이벤트 수(`limit`을 넘는 것 포함)입니다. 닫힌 Run을 `runId`로 지정하면 Run 저장소에서 읽습니다.
   - `POST /wait` `{ filter, count?, timeoutMs? }` → `{ events, timedOut }`. `after`가 없으면 부른 뒤부터 셉니다. 이 경로는 `Bun.serve`의 유휴 타임아웃을 끄고 받습니다(최대 120초 대기).
-  - `POST /lease` → `{ leaseId, expiresAt }`. `DELETE /lease` → `{ released }`
+  - `POST /lease` → `{ leaseId, expiresAt }`. `DELETE /lease` → `{ released }`(보유자가 아니면 오류·거절 이벤트 없이 `released: false`)
 - 오류 코드의 HTTP 상태는 `src/shared/testbed/errors.ts`의 `TESTBED_ERROR_STATUS`가 원본입니다. 없는 경로는 JSON 404입니다.
 - `start_run`의 `configOverrides`는 Run이 닫힐 때(교체 포함) Run 직전 설정으로 돌아갑니다. 하나라도 재시작이 필요하면 모두 되돌리고 `RESTART_REQUIRED`입니다.
 

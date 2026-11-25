@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { TestbedError } from '../errors';
+import type { TestbedError } from '../errors';
 import { EventBus } from '../events/bus';
 import { waitForEvent } from '../testing';
 import { LeaseManager } from './lease';
@@ -98,10 +98,13 @@ describe('lease for MCP sessions', () => {
     lease.dispose();
   });
 
-  test('only the holder may release; forceRelease always can', () => {
-    const { lease } = setup();
+  test('only the holder releases (others get false, no denial); forceRelease always can', () => {
+    const { lease, kinds } = setup();
     lease.acquire({ actor: 'ci' });
-    expect(() => lease.release({ actor: 'ci', leaseId: 'wrong' })).toThrow(TestbedError);
+    expect(lease.release({ actor: 'ci', leaseId: 'wrong' })).toBe(false);
+    expect(lease.release(otherAgent)).toBe(false);
+    expect(lease.view()).not.toBeNull();
+    expect(kinds()).toEqual(['testbed.lease.acquired']);
     expect(lease.forceRelease()).toBe(true);
     expect(lease.forceRelease()).toBe(false);
     lease.dispose();

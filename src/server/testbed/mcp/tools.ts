@@ -335,7 +335,7 @@ function commonTools(control: ControlService): McpTool[] {
     tool({
       name: 'release_control',
       description:
-        '이 세션이 가진 제어 락을 풂. 작업이 끝나면 반드시 부름. 락이 없으면 `released: false`.',
+        '이 세션이 가진 제어 락을 풂. 작업이 끝나면 반드시 부름. 이 세션이 락을 갖고 있지 않으면(락이 없거나 다른 보유자) 오류 없이 `released: false`.',
       input: emptyInput,
       readOnly: false,
       run: (_input, caller) => {

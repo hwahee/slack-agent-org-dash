@@ -123,10 +123,13 @@ export class LeaseManager {
     throw this.deny(caller, fn);
   }
 
-  /** The holder gives the lease back (REST `DELETE /lease`, MCP `release_control`). */
+  /**
+   * The holder gives the lease back (REST `DELETE /lease`, MCP
+   * `release_control`). Anyone else has nothing to give back: `false`, not a
+   * refusal — the lease stays with its holder either way.
+   */
   release(caller: Caller): boolean {
-    if (!this.holder) return false;
-    if (!this.holds(caller)) throw this.deny(caller, 'releaseLease');
+    if (!this.holder || !this.holds(caller)) return false;
     this.end('released', caller.actor);
     return true;
   }

@@ -301,6 +301,12 @@ describe('the lease across sessions', () => {
     expect(human.status).toBe(423);
     expect((human.body.error as ToolError).code).toBe('LOCKED');
 
+    // release_control by a session without the lease: false, no error, no denial.
+    expect(await second.call<Record<string, unknown>>('release_control')).toEqual({
+      released: false,
+    });
+    expect(events('testbed.lease.denied')).toHaveLength(2);
+
     expect(await first.call<Record<string, unknown>>('release_control')).toEqual({
       released: true,
     });

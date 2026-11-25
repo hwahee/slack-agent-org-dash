@@ -200,6 +200,20 @@ describe('testbed_info', () => {
     expect(result.content[0]?.text).toContain('run: none');
     expect(result.content[0]?.text).toContain('lease: none');
   });
+
+  test('an open Run is brief: no configSnapshot', async () => {
+    const { connect } = await startTestbed();
+    const agent = await connect('m5-agent');
+    const run = await agent.call<{ runId: string; configSnapshot: unknown }>('start_run', {
+      label: 'brief',
+    });
+    expect(run.configSnapshot).toBeDefined();
+    const info = (await agent.raw('testbed_info')).structuredContent as {
+      run: Record<string, unknown>;
+    };
+    expect(info.run).toMatchObject({ runId: run.runId, label: 'brief' });
+    expect(info.run).not.toHaveProperty('configSnapshot');
+  });
 });
 
 describe('a test session', () => {

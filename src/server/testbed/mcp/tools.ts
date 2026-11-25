@@ -9,6 +9,7 @@ import {
   type Caller,
   type TestbedEvent,
 } from '@shared/testbed/events';
+import type { RunMeta } from '@shared/testbed/runs';
 import { toJsonSchema, ValidationError, type Validator } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
@@ -84,6 +85,14 @@ function tool<T>(definition: {
   };
 }
 
+/** A Run for `testbed_info`: who, when, which seed — not the config snapshot. */
+function runBrief({
+  configSnapshot: _snapshot,
+  ...rest
+}: RunMeta): Omit<RunMeta, 'configSnapshot'> {
+  return rest;
+}
+
 function plain(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -151,7 +160,9 @@ function commonTools(control: ControlService): McpTool[] {
             version: manifest.version,
             instanceId: manifest.instanceId,
             cores,
-            run: status.run,
+            // The Run without its configSnapshot (every core's config): that
+            // is in the Run's own record (REST GET /runs/current).
+            run: status.run === null ? null : runBrief(status.run),
             lease: status.lease,
           },
         });

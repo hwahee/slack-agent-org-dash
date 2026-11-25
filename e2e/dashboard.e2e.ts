@@ -50,6 +50,16 @@ test('2. event flow: TCP data shows up in the log, and its payload in the detail
   const bytes = payload.locator('.tb-json__line[data-path="payload.bytes"]');
   await expect(bytes).toContainText('5');
   await expect(payload).toContainText('"hello"');
+
+  // Typing fast into a filter keeps every character (the address follows).
+  const kind = page.getByLabel('Kind prefix');
+  await kind.pressSequentially('sample.data');
+  await expect(kind).toHaveValue('sample.data');
+  const search = page.getByLabel('Search summary');
+  await search.pressSequentially('C-1 echoed');
+  await expect(search).toHaveValue('C-1 echoed');
+  await expect(page).toHaveURL(/kind=sample\.data/);
+  await expect(page).toHaveURL(/q=C-1\+echoed/);
 });
 
 test('3. Run: start from the Run tab, data, end; the past Run summarizes it', async ({ page }) => {

@@ -74,7 +74,7 @@
 
 - **이벤트 로그**(`event-log.tsx`)
   - 한 행: 시각(브라우저 시간대 `HH:MM:SS.mmm`), level, actor, replica(보이는 행 중 하나라도 값이 있을 때만), kind, summary. 행 높이 28px 고정, 보이는 행과 위아래 20행만 그립니다.
-  - 필터: Run(현재 = 열린 Run, 없으면 전체 / 전체 / 특정 Run), core, kind 접두사, level 이상, actor, replica(외부 코어가 있을 때), summary 검색. 주소의 `run`, `core`, `kind`, `level`, `actor`, `replica`, `q`에 남습니다(`run=current`와 빈 값은 생략).
+  - 필터: Run(현재 = 열린 Run, 없으면 전체 / 전체 / 특정 Run), core, kind 접두사, level 이상, actor, replica(외부 코어가 있을 때), summary 검색. 주소의 `run`, `core`, `kind`, `level`, `actor`, `replica`, `q`에 남습니다(`run=current`와 빈 값은 생략). kind와 검색 입력칸은 친 글자를 스스로 들고 있다가 바뀔 때마다 주소에 씁니다(주소에서 값을 다시 읽어 넣지 않으므로 빠르게 치거나 한글을 조합해도 글자가 사라지지 않음). 각 필터는 주소의 현재 값에 덮어씁니다.
   - 맨 아래(반 행 이내)에 있으면 새 이벤트를 따라갑니다. 위로 스크롤하면 멈추고 "새 이벤트 n건 · 맨 아래로" 버튼을 띄웁니다. 스크롤 이벤트가 닿기 전에 새 행이 오면, 마지막 자동 스크롤 위치보다 위에 있는지로 사람이 올라간 것을 알아챕니다.
   - 스토어의 `omitted` 누적(서버 표본화로 빠진 건수)을 로그 위에 표시합니다.
   - 열린 Run이 아닌 Run을 고르면 스토어 대신 `GET /events?runId=…`를 커서로 이어 받습니다(500건씩, 최대 20,000건).

@@ -66,9 +66,10 @@ idle → starting → running → stopping → stopped
 
 - 상태가 바뀔 때마다 `testbed.core.state` 이벤트가 나갑니다(`actor: 'system'`, payload `{ core, from, to, detail? }`).
 - `error`에서는 `start`로 다시 시작할 수 있습니다. `error`로 갈 때 이벤트의 `level`은 `error`이고, `payload.detail`에 원인을 담습니다.
-- `status().endpoints`는 데이터면 주소 목록(`{ name, protocol, url }`)입니다. 매니페스트, 대시보드 연결 패널, MCP `testbed_info`에 그대로 나타납니다. `url`은 `TESTBED_PUBLIC_URL`의 호스트를 씁니다.
+- `status().endpoints`는 데이터면 주소 목록(`{ name, protocol, url, replica? }`)입니다. 외부 코어는 복제마다 따로 나열하고 `replica`를 붙입니다. 매니페스트, 대시보드 연결 패널, MCP `testbed_info`에 그대로 나타납니다. `url`은 `TESTBED_PUBLIC_URL`의 호스트를 씁니다.
 - 부팅 시 자동 시작 여부는 코어 설정 `autoStart`로 정합니다. passive는 기본 `true`, active·scenario는 기본 `false`입니다.
 - `applyConfig`가 `restart-required`를 돌려주면 설정은 저장되지만 적용되지 않습니다. 제어 서비스가 `RESTART_REQUIRED`로 알리고, 다음 `stop` → `start` 때 적용됩니다. 코어가 running이 아니면 `applyConfig`를 부르지 않고 저장만 합니다(`applied`).
+- 외부 코어의 상태(`CoreStatus`)에는 `external: true`와 `replicas: ReplicaStatus[]`(`{ id, state, detail?, pid?, restarts, lastPingMs?, counters, endpoints }`)가 붙습니다(`src/shared/testbed/core.ts`). 위의 `state`는 복제들의 전체 상태(`error` → `starting` → `stopping` → `stopped` → `idle` → `running` 순으로 앞선 것), `counters`는 복제 카운터의 합입니다([external-core-protocol.md](external-core-protocol.md) §6).
 - 액션은 코어가 `running`일 때만 실행됩니다. 아니면 `CORE_NOT_RUNNING`입니다. 입력과 출력은 액션의 `input`·`output` 검증기를 거칩니다.
 
 ## 4. 액션

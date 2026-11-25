@@ -37,6 +37,8 @@ export interface CoreHostOptions {
   publicHost?: string;
   /** External cores' working directory (the repository root). Default: this process's. */
   cwd?: string;
+  /** External cores' supervisor timings — shortened in tests (protocol §8). */
+  externalTiming?: { restartBackoffMs?: number; stableMs?: number };
 }
 
 /** An in-proc core or an external one, as listed in `cores/index.ts`. */
@@ -48,6 +50,8 @@ export interface CoreDescription {
   kind: CoreKind;
   title: string;
   external: boolean;
+  /** The configured replica count (1 for in-proc cores). */
+  replicas: number;
   configSchema: Record<string, unknown>;
   actions: {
     name: string;
@@ -151,6 +155,9 @@ export class CoreHost {
           log,
           env: this.env,
           cwd: this.options.cwd ?? process.cwd(),
+          ...(this.options.externalTiming === undefined
+            ? {}
+            : { timing: this.options.externalTiming }),
         }),
       );
       this.order.push(id);
@@ -323,6 +330,7 @@ export class CoreHost {
         title: external.title,
         ...external.state(),
         ...external.status(),
+        external: true,
       };
     }
     const core = this.get(id);
@@ -350,6 +358,7 @@ export class CoreHost {
         kind: external.kind,
         title: external.title,
         external: true,
+        replicas: external.getConfig().replicas,
         ...external.describe(),
       };
     }
@@ -359,6 +368,7 @@ export class CoreHost {
       kind: definition.kind,
       title: definition.title,
       external: false,
+      replicas: 1,
       configSchema: toJsonSchema(definition.configSchema),
       actions: Object.entries(definition.actions ?? {}).map(([name, action]) => ({
         name,
@@ -388,10 +398,26 @@ export class CoreHost {
   }
 
   /** Validates the input, runs the action, validates the output. */
-  async invokeAction(id: string, name: string, input: unknown, caller: Caller): Promise<unknown> {
+  /** `replica` picks one replica of an external core (protocol §6). */
+  async invokeAction(
+    id: string,
+    name: string,
+    input: unknown,
+    caller: Caller,
+    replica?: string,
+  ): Promise<unknown> {
     const external = this.externals.get(id);
-    if (external) return external.invokeAction(name, input, caller);
+    if (external) return external.invokeAction(name, input, caller, replica);
     const core = this.get(id);
+    if (replica !== undefined) {
+      throw new ValidationError([
+        {
+          path: 'replica',
+          message: `${id} is an in-proc core: it has no replicas`,
+          code: 'no_replicas',
+        },
+      ]);
+    }
     const action = core.definition.actions?.[name];
     if (!action) throw new NotFoundError('action', `${id}.${name}`);
     const parsed = action.input.parse(input);

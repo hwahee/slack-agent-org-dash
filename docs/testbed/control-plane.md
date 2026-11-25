@@ -6,21 +6,21 @@
 
 ### 1.1 함수
 
-| 함수                            | 조작성(락 필요) | 내용                                            |
-| ------------------------------- | --------------- | ----------------------------------------------- |
-| `getManifest`                   | –               | 매니페스트(§6)                                  |
-| `getStatus`                     | –               | 코어 상태, 열린 Run, 락                         |
-| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치                      |
-| `start` / `stop` / `reset`      | ●               | 코어 하나 또는 전체                             |
-| `startRun` / `endRun`           | ●               | [runs-and-checks.md](runs-and-checks.md)        |
-| `listRuns`                      | –               | Run 목록과 요약                                 |
-| `queryEvents` / `getEvent`      | –               | 이벤트 조회 / 하나의 전체 payload               |
-| `waitFor`                       | –               | 조건에 맞는 이벤트 대기                         |
-| `check`                         | –               | 판정                                            |
-| `exportRun`                     | –               | JSONL 내보내기                                  |
-| `exportLocation`                | –               | 내보내기 URL·파일 경로(MCP `export_run`)        |
-| `invokeAction`                  | 액션별          | 코어 액션([core-contract.md](core-contract.md)) |
-| `acquireLease` / `releaseLease` | –               | 제어 락                                         |
+| 함수                            | 조작성(락 필요) | 내용                                                                                      |
+| ------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| `getManifest`                   | –               | 매니페스트(§6)                                                                            |
+| `getStatus`                     | –               | 코어 상태, 열린 Run, 락                                                                   |
+| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치                                                                |
+| `start` / `stop` / `reset`      | ●               | 코어 하나 또는 전체                                                                       |
+| `startRun` / `endRun`           | ●               | [runs-and-checks.md](runs-and-checks.md)                                                  |
+| `listRuns`                      | –               | Run 목록과 요약                                                                           |
+| `queryEvents` / `getEvent`      | –               | 이벤트 조회 / 하나의 전체 payload                                                         |
+| `waitFor`                       | –               | 조건에 맞는 이벤트 대기                                                                   |
+| `check`                         | –               | 판정                                                                                      |
+| `exportRun`                     | –               | JSONL 내보내기                                                                            |
+| `exportLocation`                | –               | 내보내기 URL·파일 경로(MCP `export_run`)                                                  |
+| `invokeAction`                  | 액션별          | 코어 액션([core-contract.md](core-contract.md)). 외부 코어는 `replica`로 복제 하나를 고름 |
+| `acquireLease` / `releaseLease` | –               | 제어 락                                                                                   |
 
 - 모든 함수는 `caller: { actor, sessionId?, leaseId?, name? }`를 받습니다. `sessionId`는 MCP 세션 id, `leaseId`는 REST로 잡은 락의 id, `name`은 표시 이름(예: MCP `clientInfo.name`)입니다.
 - 조작성 함수가 불리면 `testbed.control.invoked` 이벤트가 남습니다(함수 이름, 입력 요약, caller, 결과).
@@ -79,22 +79,22 @@
 
 ## 3. REST — `/testbed/api`
 
-| 메서드·경로                            | 내용                                                |
-| -------------------------------------- | --------------------------------------------------- |
-| `GET /manifest`                        | §6                                                  |
-| `GET /status`                          | 코어 상태, 열린 Run, 락                             |
-| `GET /cores/:core/config`              | 설정 조회                                           |
-| `PATCH /cores/:core/config`            | 부분 패치. 응답에 `applied` 또는 `restart-required` |
-| `POST /cores/:core/{start,stop,reset}` | `:core`를 `_all`로 쓰면 전체                        |
-| `POST /cores/:core/actions/:name`      | 코어 액션                                           |
-| `POST /runs`                           | Run 시작                                            |
-| `POST /runs/current/end`               | Run 종료                                            |
-| `GET /runs` · `GET /runs/:id`          | 목록과 요약                                         |
-| `GET /runs/:id/export`                 | JSONL 스트림                                        |
-| `GET /events?…filter&after&limit`      | 조회(§1.2)                                          |
-| `GET /events/:id`                      | 전체 payload. `:id`는 이벤트 id                     |
-| `POST /wait` · `POST /check`           | §4와 같음                                           |
-| `POST /lease` · `DELETE /lease`        | 락 획득·해제(§2.2)                                  |
+| 메서드·경로                            | 내용                                                 |
+| -------------------------------------- | ---------------------------------------------------- |
+| `GET /manifest`                        | §6                                                   |
+| `GET /status`                          | 코어 상태, 열린 Run, 락                              |
+| `GET /cores/:core/config`              | 설정 조회                                            |
+| `PATCH /cores/:core/config`            | 부분 패치. 응답에 `applied` 또는 `restart-required`  |
+| `POST /cores/:core/{start,stop,reset}` | `:core`를 `_all`로 쓰면 전체                         |
+| `POST /cores/:core/actions/:name`      | 코어 액션. 외부 코어는 `?replica=r1`로 복제 하나에만 |
+| `POST /runs`                           | Run 시작                                             |
+| `POST /runs/current/end`               | Run 종료                                             |
+| `GET /runs` · `GET /runs/:id`          | 목록과 요약                                          |
+| `GET /runs/:id/export`                 | JSONL 스트림                                         |
+| `GET /events?…filter&after&limit`      | 조회(§1.2)                                           |
+| `GET /events/:id`                      | 전체 payload. `:id`는 이벤트 id                      |
+| `POST /wait` · `POST /check`           | §4와 같음                                            |
+| `POST /lease` · `DELETE /lease`        | 락 획득·해제(§2.2)                                   |
 
 - 오류는 보일러플레이트의 에러 엔벨로프(`src/shared/api/errors.ts`)를 따릅니다. 추가 코드:
 
@@ -158,6 +158,7 @@
 - `EventLine`은 `{ id, ts, level, kind, summary, correlationId? }`입니다(`src/shared/testbed/events.ts`의 `toEventLine`).
 - `query_events`의 `total`은 커서 뒤에서 필터에 맞는 이벤트 수(`limit`을 넘는 것 포함)이고, `nextCursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로)입니다.
 - `wait_for`의 `timeoutMs`가 상한을 넘으면 검증 오류가 아니라 120000으로 잘립니다.
+- **외부 코어의 액션 도구**: 입력 스키마에 선택 속성 `replica`(문자열, 예: `"r1"`)가 덧붙습니다. 주면 그 복제에만, 없으면 모든 복제에 보냅니다. 결과는 복제가 1개면 출력 그대로, 2개 이상이면 `{ r0: 출력, r1: 출력, … }`이고, 실패한 복제의 자리에는 `{ error: { code, message } }`가 들어갑니다(전체는 성공). 없는 복제는 `VALIDATION_ERROR`입니다([external-core-protocol.md](external-core-protocol.md) §6). REST·제어 서비스도 같은 규칙입니다.
 - **액션 자동 노출**: `surfaces`에 `mcp`가 있는 액션마다 `<core>_<action>` 도구를 만듭니다. 코어 id의 `-`는 `_`로 바꿉니다. 설명은 액션의 `description`에 " (제어 락 필요)" 또는 " (읽기 전용)"을 덧붙이고, 입력 스키마는 액션 `input` 검증기의 JSON Schema입니다.
 - **도구 주석**: 읽기 도구(`testbed_info`, `get_config`, `query_events`, `get_event`, `wait_for`, `check`, `export_run`, `mutating: false` 액션)는 `annotations.readOnlyHint: true`, 나머지는 `false`입니다.
 - **결과 형식**
@@ -204,6 +205,7 @@
       "kind": "passive",
       "title": "…",
       "state": "running",
+      "external": false,
       "replicas": 1,
       "endpoints": [{ "name": "openai", "protocol": "http", "url": "http://host:40021/v1" }],
       "actions": [{ "name": "enqueue_response", "mutating": true, "inputSchema": {} }],
@@ -217,6 +219,7 @@
 }
 ```
 
+- 코어마다 `external`(외부 프로세스 코어인지)과 `replicas`(설정된 복제 수. in-proc 코어는 1)가 있습니다. 외부 코어의 `configSchema`·`actions`·`faults`는 프로세스의 `initialize` 응답 그대로입니다(glue 필드 §2.1은 스키마에 없지만 `GET /cores/:core/config`에는 들어 있음). `initialize`에 실패한 코어는 `state: 'error'`, 액션 없이 나옵니다.
 - `version`은 빌드의 git SHA, `baseVersion`은 이 테스트베드가 머지한 `testbed-base`의 공통 런타임 버전(`src/server/testbed/version.ts`)입니다.
 - `publicUrl`은 `TESTBED_PUBLIC_URL`입니다. 대시보드 연결 패널의 MCP URL과 `.mcp.json` 조각은 모두 이 값으로 만듭니다.
 - 타입은 `src/shared/testbed/control.ts`의 `TestbedManifest`입니다(`TestbedStatus`, WS 메시지 `TestbedSocketMessage`도 같은 곳).

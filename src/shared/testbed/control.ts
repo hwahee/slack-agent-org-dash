@@ -28,6 +28,9 @@ export interface TestbedManifest {
     kind: CoreKind;
     title: string;
     state: CoreState;
+    /** A process of its own (docs/testbed/external-core-protocol.md). */
+    external: boolean;
+    /** The configured replica count (1 for in-proc cores). */
     replicas: number;
     endpoints: CoreEndpoint[];
     actions: {

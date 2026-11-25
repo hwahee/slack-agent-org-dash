@@ -35,8 +35,10 @@ export async function createTestbedRuntime(options: {
   cores: readonly AnyCoreDefinition[];
   /** External cores' working directory (the repository root). */
   cwd?: string;
+  /** External cores' supervisor timings (tests shorten them). */
+  externalTiming?: { restartBackoffMs?: number; stableMs?: number };
 }): Promise<TestbedRuntime> {
-  const { config, env, log, cores, cwd } = options;
+  const { config, env, log, cores, cwd, externalTiming } = options;
   const bus = new EventBus({
     bufferSize: config.eventBuffer,
     maxPayloadBytes: config.maxPayloadBytes,
@@ -54,6 +56,7 @@ export async function createTestbedRuntime(options: {
     bindHost: config.bindHost,
     publicHost: new URL(config.publicUrl).hostname,
     ...(cwd === undefined ? {} : { cwd }),
+    ...(externalTiming === undefined ? {} : { externalTiming }),
   });
   for (const core of cores) host.register(core);
   return { bus, store, runs, host };

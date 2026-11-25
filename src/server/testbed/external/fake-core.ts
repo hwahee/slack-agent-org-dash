@@ -2,6 +2,8 @@
  * A fake external core for the common runtime's tests (docs/spec.md §11 P4).
  * Run with `bun`; `<CORE_ID>_MODE` (e.g. `FAKE_MODE`) picks a misbehaviour:
  *
+ *   (`<CORE_ID>_MODE_R1` sets one replica's mode)
+ *
  *   normal             speaks the protocol; action `echo {text}` → `{ text, replica }`
  *   crash-after-start  answers `start`, then exits with code 3
  *   hang-status        never answers `status`
@@ -91,7 +93,11 @@ async function handle(request: Request): Promise<unknown> {
       coreId = String(params.coreId);
       replicaId = String(params.replicaId);
       replicaIndex = Number(params.replicaIndex);
-      mode = env[`${prefix(coreId)}_MODE`] ?? 'normal';
+      // `<ID>_MODE_R1` gives one replica its own mode.
+      mode =
+        env[`${prefix(coreId)}_MODE_${replicaId.toUpperCase()}`] ??
+        env[`${prefix(coreId)}_MODE`] ??
+        'normal';
       seeds.push(String(params.seed));
       runIds.push((params.runId as string | null) ?? null);
       if (mode === 'ignore-shutdown') process.on('SIGTERM', () => undefined);

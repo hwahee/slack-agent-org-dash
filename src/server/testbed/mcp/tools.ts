@@ -323,6 +323,24 @@ function commonTools(control: ControlService): McpTool[] {
   ];
 }
 
+const REPLICA_NOTE =
+  ' 외부 코어: `replica`(예: "r1")를 주면 그 복제에만, 없으면 모든 복제에 보내고 복제가 둘 이상이면 { r0: 출력, r1: 출력 }을 돌려줌.';
+
+/** An external core's action tool also takes `replica` (protocol §6). */
+function withReplica(schema: Record<string, unknown>): Record<string, unknown> {
+  const properties = (schema.properties ?? {}) as Record<string, unknown>;
+  return {
+    ...schema,
+    properties: {
+      ...properties,
+      replica: {
+        type: 'string',
+        description: 'One replica (r0, r1, …); omit for every replica',
+      },
+    },
+  };
+}
+
 /** `<core>_<action>` for every action whose `surfaces` include `mcp`. */
 function actionTools(control: ControlService): McpTool[] {
   const manifest = control.getManifest({ actor: 'system' });
@@ -331,11 +349,20 @@ function actionTools(control: ControlService): McpTool[] {
       .filter((action) => action.surfaces.includes('mcp'))
       .map((action): McpTool => ({
         name: `${core.id.replaceAll('-', '_')}_${action.name}`,
-        description: `${action.description}${action.mutating ? LOCKED : READ_ONLY}`,
-        inputSchema: objectSchema(action.inputSchema),
+        description: `${action.description}${core.external ? REPLICA_NOTE : ''}${action.mutating ? LOCKED : READ_ONLY}`,
+        inputSchema: core.external
+          ? withReplica(objectSchema(action.inputSchema))
+          : objectSchema(action.inputSchema),
         readOnly: !action.mutating,
         call: async (input, caller) => {
-          const output = await control.invokeAction(core.id, action.name, input ?? {}, caller);
+          let rest: unknown = input ?? {};
+          let replica: string | undefined;
+          if (core.external && typeof rest === 'object' && rest !== null && 'replica' in rest) {
+            const { replica: picked, ...others } = rest as Record<string, unknown>;
+            if (typeof picked === 'string') replica = picked;
+            rest = others;
+          }
+          const output = await control.invokeAction(core.id, action.name, rest, caller, replica);
           return { text: JSON.stringify(output), structured: plain(output) };
         },
       })),

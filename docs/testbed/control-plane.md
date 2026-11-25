@@ -49,7 +49,7 @@
 
 ### 2.1 MCP (에이전트)
 
-- **획득**: 에이전트의 첫 조작성 호출 때 자동으로 획득합니다. `acquire_control`로 명시적으로 얻을 수도 있습니다. 보유자는 MCP 세션 id(`Mcp-Session-Id`)와 `clientInfo.name`입니다.
+- **획득**: 에이전트의 첫 조작성 호출 때 자동으로 획득합니다. 그 호출이 실패하면(예: 사람이 연 Run 때문에 `start_run`이 `RUN_ACTIVE`) 잡은 락을 바로 놓습니다(`testbed.lease.released`, `reason: 'operation-failed'`). 이미 쥐고 있던 락은 실패해도 그대로입니다. `acquire_control`로 명시적으로 얻을 수도 있습니다. 보유자는 MCP 세션 id(`Mcp-Session-Id`)와 `clientInfo.name`입니다.
 - **유지**: 보유자가 제어면을 호출할 때마다 TTL(`TESTBED_LEASE_TTL_SEC`, 기본 600초)이 연장됩니다. 읽기 호출도 연장합니다. 호출 없이 TTL이 지나면 자동 해제되고 `testbed.lease.expired` 이벤트가 남습니다.
 - **해제**: `release_control`, MCP 세션 종료(`DELETE`), TTL 만료 중 하나.
 
@@ -78,7 +78,7 @@
 ### 2.4 강제 해제 — `bun run testbed:release`
 
 - 실행 중인 인스턴스의 로컬 전용 경로 `POST /testbed/internal/release`를 `127.0.0.1:$PORT`로 부릅니다. 루프백이 아닌 주소에서 오거나 `X-Forwarded-For`가 붙은 요청은 404로 거절합니다.
-- 해제는 `testbed.lease.released`(`actor: 'system'`, `payload.reason: 'forced'`)로 남습니다. 다른 해제 사유는 `released`(보유자가 해제), `session-closed`(MCP 세션 종료)입니다.
+- 해제는 `testbed.lease.released`(`actor: 'system'`, `payload.reason: 'forced'`)로 남습니다. 다른 해제 사유는 `released`(보유자가 해제), `session-closed`(MCP 세션 종료), `operation-failed`(락을 자동으로 잡은 조작이 실패함, §2.1)입니다.
 
 ## 3. REST — `/testbed/api`
 

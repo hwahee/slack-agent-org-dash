@@ -24,7 +24,7 @@ interface Holder {
   leaseId?: string;
 }
 
-export type ReleaseReason = 'released' | 'session-closed' | 'forced';
+export type ReleaseReason = 'released' | 'session-closed' | 'forced' | 'operation-failed';
 
 function short(id: string | undefined): string {
   return (id ?? '').slice(0, 4);
@@ -108,19 +108,29 @@ export class LeaseManager {
   /**
    * Gate for every control call. The holder's calls extend the lease. An
    * operation by anyone else while it is held is refused (and recorded); with
-   * no lease, an MCP session's first operation takes it.
+   * no lease, an MCP session's first operation takes it. Returns whether this
+   * call took the lease, so a failed operation can give it back.
    */
-  authorize(caller: Caller, fn: string, mutating: boolean): void {
+  authorize(caller: Caller, fn: string, mutating: boolean): boolean {
     if (this.holds(caller)) {
       this.extend();
-      return;
+      return false;
     }
-    if (!mutating) return;
+    if (!mutating) return false;
     if (!this.holder) {
-      if (caller.sessionId !== undefined) this.acquire(caller, fn);
-      return;
+      if (caller.sessionId === undefined) return false;
+      this.acquire(caller, fn);
+      return true;
     }
     throw this.deny(caller, fn);
+  }
+
+  /**
+   * The operation that took the lease (`authorize` returned true) failed: the
+   * lease goes back, so a refused call does not lock people out for the TTL.
+   */
+  undoAcquire(caller: Caller): void {
+    if (this.holds(caller)) this.end('operation-failed', caller.actor);
   }
 
   /**

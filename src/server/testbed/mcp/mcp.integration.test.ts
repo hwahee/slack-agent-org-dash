@@ -322,6 +322,23 @@ describe('the lease across sessions', () => {
     });
   });
 
+  test('an operation that took the lease and failed gives it back', async () => {
+    const { connect, rest, runtime, plane } = await startTestbed();
+    expect((await rest('POST', '/runs', { label: 'human-run' })).status).toBe(201);
+    const agent = await connect('m5-agent');
+    await agent.fail('start_run', { label: 'agent-run' }, 'RUN_ACTIVE');
+    const released = await waitForEvent(
+      runtime.bus,
+      (event) => event.kind === 'testbed.lease.released',
+    );
+    expect(released.payload).toMatchObject({ reason: 'operation-failed' });
+    expect(plane.control.lease.view()).toBeNull();
+    // A lease the session already held stays when a later call fails.
+    await agent.call('acquire_control');
+    await agent.fail('start_run', { label: 'agent-run' }, 'RUN_ACTIVE');
+    expect(plane.control.lease.view()).toMatchObject({ name: 'm5-agent' });
+  });
+
   test('closing the holding session with DELETE releases the lease', async () => {
     const { connect, runtime, plane } = await startTestbed();
     const agent = await connect('m5-agent');

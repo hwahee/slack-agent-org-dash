@@ -365,7 +365,7 @@ export class ControlService {
     input: unknown,
     body: () => Promise<T>,
   ): Promise<T> {
-    this.lease.authorize(caller, fn, true);
+    const acquired = this.lease.authorize(caller, fn, true);
     const recorded = publicCaller(caller);
     try {
       const result = await body();
@@ -373,6 +373,7 @@ export class ControlService {
       return result;
     } catch (error) {
       this.invoked(fn, recorded, input, errorCode(error));
+      if (acquired) this.lease.undoAcquire(caller);
       throw error;
     }
   }

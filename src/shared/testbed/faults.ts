@@ -37,12 +37,23 @@ export interface FaultRule {
 
 /**
  * What the schema cannot say about a core's `faults` list, checked by both
- * hosts (in-proc and external) on every config: a delay range must not run
- * backwards.
+ * hosts (in-proc and external) on every config: ids are unique (events and
+ * checks tell rules apart by id), and a delay range must not run backwards.
  */
 export function faultRulesIssues(rules: readonly FaultRule[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const seen = new Map<string, number>();
   rules.forEach((rule, index) => {
+    const first = seen.get(rule.id);
+    if (first === undefined) {
+      seen.set(rule.id, index);
+    } else {
+      issues.push({
+        path: `faults.${index}.id`,
+        message: `규칙 id '${rule.id}'가 faults.${first}와 겹침. id는 규칙마다 달라야 함`,
+        code: 'duplicate_id',
+      });
+    }
     const delay = rule.delayMs;
     if (typeof delay === 'object' && delay.min > delay.max) {
       issues.push({

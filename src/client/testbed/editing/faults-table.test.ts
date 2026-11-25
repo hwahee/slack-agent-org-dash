@@ -74,6 +74,14 @@ describe('fault rules ↔ table', () => {
     ]);
   });
 
+  test('a repeated id is reported on the later row', () => {
+    const { errors } = rowsToRules([
+      { ...emptyRow('f1'), effect: 'disconnect' },
+      { ...emptyRow(' f1 '), effect: 'corrupt' },
+    ]);
+    expect(errors).toEqual([{ row: 1, column: 'id', message: '같은 id가 위에 있음' }]);
+  });
+
   test('a delay range that runs backwards is reported on its cell', () => {
     const { errors } = rowsToRules([{ ...emptyRow('f1'), delayMs: '300-100' }]);
     expect(errors).toEqual([{ row: 0, column: 'delayMs', message: '최소값이 최대값보다 큼' }]);

@@ -49,6 +49,22 @@ describe('CoreHost', () => {
     expect(h.getConfig('sample').faults).toEqual([]);
   });
 
+  test('two fault rules with the same id are a ValidationError', async () => {
+    const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
+    h.register(sampleCore);
+    const error = await h
+      .setConfig('sample', {
+        faults: [
+          { id: 'f1', disconnect: true },
+          { id: 'f1', delayMs: 10 },
+        ],
+      })
+      .catch((caught: unknown) => caught);
+    expect((error as ValidationError).issues).toEqual([
+      expect.objectContaining({ path: 'faults.1.id', code: 'duplicate_id' }),
+    ]);
+  });
+
   test('autoStart false: startAutoStart leaves the core idle', async () => {
     const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
     h.register(sampleCore);

@@ -110,6 +110,8 @@ export function rowsToRules(rows: readonly FaultRow[]): {
       errors.push({ row: index, column, message });
     const rule: FaultRule = { id: row.id.trim() };
     if (rule.id === '') fail('id', 'required');
+    else if (rows.slice(0, index).some((other) => other.id.trim() === rule.id))
+      fail('id', '같은 id가 위에 있음');
 
     if (row.match.trim() !== '') {
       const match: Record<string, unknown> = {};

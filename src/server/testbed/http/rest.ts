@@ -109,7 +109,15 @@ export function testbedRestRoutes(control: ControlService, deps: HttpDeps, auth:
     }),
     '/testbed/api/cores/:core/actions/:name': route<'/testbed/api/cores/:core/actions/:name'>({
       POST: async (req, caller) =>
-        json(await control.invokeAction(req.params.core, req.params.name, await body(req), caller)),
+        json(
+          await control.invokeAction(
+            req.params.core,
+            req.params.name,
+            await body(req),
+            caller,
+            new URL(req.url).searchParams.get('replica') ?? undefined,
+          ),
+        ),
     }),
     '/testbed/api/runs': route({
       GET: async (_req, caller) => json({ runs: await control.listRuns(caller) }),

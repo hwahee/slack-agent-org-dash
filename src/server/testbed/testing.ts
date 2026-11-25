@@ -25,6 +25,8 @@ export async function createTestControlPlane(
     server?: Pick<ServerConfig, 'authDriver' | 'oidc'>;
     /** Default: silent. */
     log?: Logger;
+    /** External cores' supervisor timings. */
+    externalTiming?: { restartBackoffMs?: number; stableMs?: number };
   } = {},
 ) {
   const env = { SAMPLE_PORT: '0', ...options.env };
@@ -35,6 +37,7 @@ export async function createTestControlPlane(
     log: options.log ?? silentLogger,
     cores: options.cores ?? [],
     cwd: REPO_ROOT,
+    ...(options.externalTiming === undefined ? {} : { externalTiming: options.externalTiming }),
   });
   const plane = createControlPlane(runtime, {
     config,
@@ -54,6 +57,7 @@ export async function startTestServer(
     /** `Bun.serve`'s idle timeout in seconds (default 10). */
     idleTimeout?: number;
     log?: Logger;
+    externalTiming?: { restartBackoffMs?: number; stableMs?: number };
   } = {},
 ) {
   const { runtime, plane } = await createTestControlPlane(options);

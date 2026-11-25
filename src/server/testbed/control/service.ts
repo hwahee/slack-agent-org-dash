@@ -96,7 +96,8 @@ export class ControlService {
           kind: core.kind,
           title: core.title,
           state: status.state,
-          replicas: 1,
+          external: core.external,
+          replicas: core.replicas,
           endpoints: status.endpoints,
           actions: core.actions,
           configSchema: core.configSchema,
@@ -302,15 +303,26 @@ export class ControlService {
     });
   }
 
-  invokeAction(core: string, name: string, input: unknown, caller: Caller): Promise<unknown> {
+  /**
+   * Runs a core action. `replica` picks one replica of an external core;
+   * without it every replica runs it (docs/testbed/external-core-protocol.md §6).
+   */
+  invokeAction(
+    core: string,
+    name: string,
+    input: unknown,
+    caller: Caller,
+    replica?: string,
+  ): Promise<unknown> {
     const mutating = this.rt.host.actionMutating(core, name) ?? true;
     const fn = `${core}.${name}`;
     if (!mutating) {
       this.read(caller, fn);
-      return this.rt.host.invokeAction(core, name, input, caller);
+      return this.rt.host.invokeAction(core, name, input, caller, replica);
     }
-    return this.operate(fn, caller, input, () =>
-      this.rt.host.invokeAction(core, name, input, caller),
+    const recorded = replica === undefined ? input : { input, replica };
+    return this.operate(fn, caller, recorded, () =>
+      this.rt.host.invokeAction(core, name, input, caller, replica),
     );
   }
 

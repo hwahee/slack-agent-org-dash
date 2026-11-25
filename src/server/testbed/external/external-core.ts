@@ -5,7 +5,13 @@
  * core's schema, the glue's part with §2.1), its state, and every request
  * and notification in between.
  */
-import type { CoreEndpoint, CoreKind, CoreState, FaultKind } from '@shared/testbed/core';
+import type {
+  CoreEndpoint,
+  CoreKind,
+  CoreState,
+  FaultKind,
+  ReplicaStatus,
+} from '@shared/testbed/core';
 import type { Actor, Caller, EventLevel } from '@shared/testbed/events';
 import { ValidationError, type ValidationIssue } from '@shared/validation';
 
@@ -31,6 +37,11 @@ import { StdioRpc } from './rpc';
 
 /** stderr lines kept per replica (protocol §7). */
 const STDERR_KEPT = 50;
+/** stderr lines in `testbed.core.process.exited` (protocol §8). */
+const STDERR_ON_EXIT = 20;
+/** Missed pings in a row before a replica counts as unresponsive. */
+const MISSES_ALLOWED = 3;
+const RESTART_MAX_MS = 30_000;
 const CORE_STATES: readonly CoreState[] = [
   'idle',
   'starting',
@@ -59,6 +70,13 @@ export interface ExternalCoreDeps {
   env: Record<string, string | undefined>;
   /** The processes' working directory (the repository root). */
   cwd: string;
+  /**
+   * Supervisor timings (protocol §8). Not config fields: tests shorten them.
+   * `restartBackoffMs` is the first wait (default 1 s, doubling to 30 s);
+   * `stableMs` is how long a replica runs, answering its pings, before its
+   * restart count goes back to 0 (default 60 s).
+   */
+  timing?: { restartBackoffMs?: number; stableMs?: number };
 }
 
 interface Replica {
@@ -76,6 +94,18 @@ interface Replica {
   endpoints: CoreEndpoint[];
   counters: Record<string, number>;
   ping?: ReturnType<typeof setInterval>;
+  /** A `status` ping is out. */
+  pinging: boolean;
+  /** Pings missed in a row. */
+  misses: number;
+  lastPingMs?: number;
+  /** Restarts since it last ran stably. */
+  restarts: number;
+  /** Bring the replica back to `running` after a restart. */
+  resume: boolean;
+  restartTimer?: ReturnType<typeof setTimeout>;
+  /** `performance.now()` when it last became `running`. */
+  runningSince?: number;
 }
 
 function errorDetail(error: unknown): string {
@@ -124,7 +154,17 @@ export class ExternalCore {
     this.kind = definition.kind;
     this.title = definition.title;
     this.glue = glueDefaults(definition.id, deps.env);
-    this.replicas = this.makeReplicas(this.glue.replicas);
+    this.replicas = Array.from({ length: this.glue.replicas }, (_, index) =>
+      this.makeReplica(index),
+    );
+  }
+
+  private get backoffMs(): number {
+    return this.deps.timing?.restartBackoffMs ?? 1000;
+  }
+
+  private get stableMs(): number {
+    return this.deps.timing?.stableMs ?? 60_000;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -139,33 +179,34 @@ export class ExternalCore {
     return this.coreConfig?.autoStart === true;
   }
 
+  /**
+   * Starts every replica. A replica that is down (failed, gave up restarting,
+   * `restart: 'never'`) is spawned again with its restart count at 0. A
+   * changed `replicas` takes effect here: new replicas are spawned, extra
+   * ones (highest number first) get `shutdown`.
+   */
   async start(): Promise<void> {
+    await this.resize();
     for (const replica of this.replicas) {
-      if (!replica.ready && !(await this.bringUp(replica))) continue;
-      if (replica.state === 'running' || replica.state === 'starting') continue;
-      this.setReplicaState(replica, 'starting');
-      try {
-        await this.call(replica, 'start', {});
-        this.setReplicaState(replica, 'running');
-        await this.refresh(replica);
-      } catch (error) {
-        this.setReplicaState(
-          replica,
-          'error',
-          errorDetail(fromCoreCall(this.id, replica.id, error)),
-        );
+      if (!replica.ready) {
+        clearTimeout(replica.restartTimer);
+        replica.restartTimer = undefined;
+        replica.restarts = 0;
+        if (!(await this.bringUp(replica))) continue;
       }
+      await this.startReplica(replica);
     }
   }
 
   async stop(): Promise<void> {
+    for (const replica of this.replicas) replica.resume = false;
     for (const replica of this.replicas) {
       if (replica.state !== 'running' || !replica.ready) continue;
       this.setReplicaState(replica, 'stopping');
       try {
         await this.call(replica, 'stop', {});
         this.setReplicaState(replica, 'stopped');
-        await this.refresh(replica);
+        void this.refresh(replica);
       } catch (error) {
         this.setReplicaState(
           replica,
@@ -181,7 +222,7 @@ export class ExternalCore {
       await this.call(replica, 'reset', {}).catch((error: unknown) => {
         throw fromCoreCall(this.id, replica.id, error);
       });
-      await this.refresh(replica);
+      void this.refresh(replica);
     }
   }
 
@@ -204,6 +245,7 @@ export class ExternalCore {
 
   /** Server shutdown: `shutdown`, then SIGTERM, then SIGKILL (protocol §8). */
   async shutdown(): Promise<void> {
+    for (const replica of this.replicas) this.stopTimers(replica);
     await Promise.all(this.replicas.map((replica) => this.endProcess(replica)));
   }
 
@@ -217,14 +259,37 @@ export class ExternalCore {
     return { state: this.overall, ...(detail === undefined ? {} : { detail }) };
   }
 
-  status(): { endpoints: CoreEndpoint[]; counters: Record<string, number> } {
+  status(): {
+    endpoints: CoreEndpoint[];
+    counters: Record<string, number>;
+    replicas: ReplicaStatus[];
+  } {
     const counters: Record<string, number> = {};
     for (const replica of this.replicas) {
       for (const [name, value] of Object.entries(replica.counters)) {
         counters[name] = (counters[name] ?? 0) + value;
       }
     }
-    return { endpoints: this.replicas.flatMap((replica) => replica.endpoints), counters };
+    return {
+      endpoints: this.replicas.flatMap((replica) => replica.endpoints),
+      counters,
+      replicas: this.replicas.map((replica) => this.replicaStatus(replica)),
+    };
+  }
+
+  private replicaStatus(replica: Replica): ReplicaStatus {
+    return {
+      id: replica.id,
+      state: replica.state,
+      ...(replica.detail === undefined ? {} : { detail: replica.detail }),
+      ...(replica.pid === undefined || !replica.rpc || replica.rpc.exited
+        ? {}
+        : { pid: replica.pid }),
+      restarts: replica.restarts,
+      ...(replica.lastPingMs === undefined ? {} : { lastPingMs: replica.lastPingMs }),
+      counters: { ...replica.counters },
+      endpoints: replica.endpoints.map((endpoint) => ({ ...endpoint })),
+    };
   }
 
   getConfig(): BaseCoreConfig & GlueConfig {
@@ -304,7 +369,9 @@ export class ExternalCore {
       core = this.validateCore({ ...core, ...corePatch });
     }
     const replicasChanged = glue.replicas !== this.glue.replicas;
+    const pingChanged = glue.pingIntervalMs !== this.glue.pingIntervalMs;
     this.glue = glue;
+    if (pingChanged) for (const replica of this.liveReplicas()) this.startPing(replica);
     if (core === this.coreConfig) return replicasChanged ? 'restart-required' : 'applied';
     this.coreConfig = core;
     let result: 'applied' | 'restart-required' = replicasChanged ? 'restart-required' : 'applied';
@@ -321,44 +388,97 @@ export class ExternalCore {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  async invokeAction(name: string, input: unknown, caller: Caller): Promise<unknown> {
+  /**
+   * Runs an action (protocol §6). With `replica` (or an input property
+   * `replica`) only on that replica; otherwise on every replica — the output
+   * as is for one replica, `{ r0: …, r1: … }` for more, where a replica that
+   * failed holds `{ error: { code, message } }` and the call still succeeds.
+   */
+  async invokeAction(
+    name: string,
+    input: unknown,
+    caller: Caller,
+    replicaId?: string,
+  ): Promise<unknown> {
     const action = this.spec?.actions[name];
     if (!action) throw new NotFoundError('action', `${this.id}.${name}`);
-    const parsed = action.input.parse(input ?? {});
-    if (this.overall !== 'running') {
+    let target = replicaId;
+    let rest = input ?? {};
+    if (target === undefined && isObject(rest) && typeof rest.replica === 'string') {
+      const { replica, ...others } = rest;
+      target = replica;
+      rest = others;
+    }
+    const parsed = action.input.parse(rest);
+    const replicas =
+      target === undefined
+        ? this.replicas
+        : this.replicas.filter((replica) => replica.id === target);
+    if (target !== undefined && replicas.length === 0) {
+      throw new ValidationError([
+        {
+          path: 'replica',
+          message: `no replica ${target} (${this.replicas.map((replica) => replica.id).join(', ')})`,
+          code: 'unknown_replica',
+        },
+      ]);
+    }
+    const notRunning = replicas.find((replica) => replica.state !== 'running');
+    if (notRunning) {
       throw new TestbedError(
         'CORE_NOT_RUNNING',
-        `코어 ${this.id}가 running이 아님(${this.overall}). start 후 다시 시도`,
-        { core: this.id, state: this.overall },
+        `코어 ${this.id}의 ${notRunning.id}가 running이 아님(${notRunning.state}). start 후 다시 시도`,
+        { core: this.id, replica: notRunning.id, state: notRunning.state },
       );
     }
-    const replica = this.replicas[0];
-    if (!replica) throw new TestbedError('CORE_NOT_RUNNING', `코어 ${this.id}에 복제가 없음`);
-    let output: unknown;
-    try {
-      output = await this.call(replica, 'action', {
-        name,
-        input: parsed,
-        caller: publicCaller(caller),
-      });
-    } catch (error) {
-      throw fromCoreCall(this.id, replica.id, error);
-    }
-    const checked = action.output.safeParse(output);
-    if (!checked.ok) {
-      throw new TestbedError(
-        'CORE_ERROR',
-        `코어 ${this.id}의 액션 ${name} 출력이 outputSchema와 맞지 않음`,
-        { core: this.id, replica: replica.id, coreCode: 'BAD_OUTPUT', issues: checked.issues },
-      );
-    }
-    return checked.value;
+
+    const runOne = async (replica: Replica): Promise<unknown> => {
+      let output: unknown;
+      try {
+        output = await this.call(replica, 'action', {
+          name,
+          input: parsed,
+          caller: publicCaller(caller),
+        });
+      } catch (error) {
+        throw fromCoreCall(this.id, replica.id, error);
+      }
+      const checked = action.output.safeParse(output);
+      if (!checked.ok) {
+        throw new TestbedError(
+          'CORE_ERROR',
+          `코어 ${this.id}의 액션 ${name} 출력이 outputSchema와 맞지 않음`,
+          { core: this.id, replica: replica.id, coreCode: 'BAD_OUTPUT', issues: checked.issues },
+        );
+      }
+      return checked.value;
+    };
+
+    const [only] = replicas;
+    if (only && (target !== undefined || this.replicas.length === 1)) return runOne(only);
+    const outcomes = await Promise.all(
+      replicas.map(async (replica) => {
+        try {
+          return [replica.id, await runOne(replica)] as const;
+        } catch (error) {
+          const code =
+            error instanceof TestbedError
+              ? error.code
+              : error instanceof ValidationError
+                ? 'VALIDATION_ERROR'
+                : 'CORE_ERROR';
+          const message = error instanceof Error ? error.message : String(error);
+          return [replica.id, { error: { code, message } }] as const;
+        }
+      }),
+    );
+    return Object.fromEntries(outcomes);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
 
-  private makeReplicas(count: number): Replica[] {
-    return Array.from({ length: count }, (_, index) => ({
+  private makeReplica(index: number): Replica {
+    return {
       id: `r${index}`,
       index,
       state: 'idle',
@@ -367,7 +487,48 @@ export class ExternalCore {
       stderr: [],
       endpoints: [],
       counters: {},
-    }));
+      pinging: false,
+      misses: 0,
+      restarts: 0,
+      resume: false,
+    };
+  }
+
+  /** Grows or shrinks the replica list to `replicas` (protocol §6). */
+  private async resize(): Promise<void> {
+    const wanted = this.glue.replicas;
+    if (wanted === this.replicas.length) return;
+    if (wanted < this.replicas.length) {
+      const extra = this.replicas.slice(wanted).reverse();
+      this.replicas = this.replicas.slice(0, wanted);
+      for (const replica of extra) {
+        this.stopTimers(replica);
+        await this.endProcess(replica);
+      }
+      this.updateOverall();
+      return;
+    }
+    for (let index = this.replicas.length; index < wanted; index++) {
+      this.replicas.push(this.makeReplica(index));
+    }
+  }
+
+  private async startReplica(replica: Replica): Promise<void> {
+    if (!replica.ready || replica.state === 'running' || replica.state === 'starting') return;
+    this.setReplicaState(replica, 'starting');
+    try {
+      await this.call(replica, 'start', {});
+      this.setReplicaState(replica, 'running');
+      void this.refresh(replica);
+    } catch (error) {
+      this.setReplicaState(replica, 'error', errorDetail(fromCoreCall(this.id, replica.id, error)));
+    }
+  }
+
+  private stopTimers(replica: Replica): void {
+    clearInterval(replica.ping);
+    clearTimeout(replica.restartTimer);
+    replica.restartTimer = undefined;
   }
 
   private liveReplicas(): Replica[] {
@@ -394,6 +555,9 @@ export class ExternalCore {
     replica.ending = false;
     replica.endpoints = [];
     replica.counters = {};
+    replica.misses = 0;
+    replica.pinging = false;
+    delete replica.lastPingMs;
     const fail = async (detail: string) => {
       if (replica.index === 0 && !this.spec) this.initProblem = detail;
       await this.endProcess(replica);
@@ -506,20 +670,67 @@ export class ExternalCore {
       const answer = await this.call(replica, 'status', {}, this.glue.pingTimeoutMs);
       this.takeStatus(replica, answer);
     } catch {
-      // The supervisor judges silence; a status that does not come is not an error here.
+      // Silence is the ping's to judge.
+    }
+  }
+
+  /**
+   * The supervisor's ping (protocol §8): `status` every `pingIntervalMs`;
+   * three answers missing in a row → `unresponsive`, SIGKILL, and the exit
+   * is handled as an unexpected one.
+   */
+  private async ping(replica: Replica): Promise<void> {
+    if (!replica.ready || replica.pinging) return;
+    const rpc = replica.rpc;
+    if (!rpc || rpc.exited) return;
+    replica.pinging = true;
+    const started = performance.now();
+    try {
+      const answer = await rpc.request('status', {}, this.glue.pingTimeoutMs);
+      replica.misses = 0;
+      replica.lastPingMs = Math.round(performance.now() - started);
+      this.takeStatus(replica, answer);
+      // Answering while running for `stableMs` clears the restart count.
+      if (
+        replica.state === 'running' &&
+        replica.runningSince !== undefined &&
+        performance.now() - replica.runningSince >= this.stableMs
+      ) {
+        replica.restarts = 0;
+      }
+    } catch {
+      if (replica.rpc !== rpc || rpc.exited) return;
+      replica.misses += 1;
+      if (replica.misses >= MISSES_ALLOWED) {
+        this.deps.bus.emit({
+          core: this.id,
+          replica: replica.id,
+          kind: 'testbed.core.process.unresponsive',
+          level: 'warn',
+          actor: 'system',
+          summary: `${this.id} ${replica.id} missed ${replica.misses} pings (${this.glue.pingTimeoutMs}ms each), killing pid ${rpc.pid}`,
+          payload: { pid: rpc.pid, missed: replica.misses, pingTimeoutMs: this.glue.pingTimeoutMs },
+        });
+        clearInterval(replica.ping);
+        rpc.kill('SIGKILL');
+      }
+    } finally {
+      if (replica.rpc === rpc) replica.pinging = false;
     }
   }
 
   private takeStatus(replica: Replica, answer: unknown): void {
     if (!isObject(answer)) return;
     if (Array.isArray(answer.endpoints)) {
-      replica.endpoints = answer.endpoints.filter(
-        (endpoint): endpoint is CoreEndpoint =>
-          isObject(endpoint) &&
-          typeof endpoint.name === 'string' &&
-          typeof endpoint.protocol === 'string' &&
-          typeof endpoint.url === 'string',
-      );
+      replica.endpoints = answer.endpoints
+        .filter(
+          (endpoint): endpoint is CoreEndpoint =>
+            isObject(endpoint) &&
+            typeof endpoint.name === 'string' &&
+            typeof endpoint.protocol === 'string' &&
+            typeof endpoint.url === 'string',
+        )
+        .map(({ name, protocol, url }) => ({ name, protocol, url, replica: replica.id }));
     }
     if (isObject(answer.counters)) {
       replica.counters = Object.fromEntries(
@@ -532,7 +743,7 @@ export class ExternalCore {
 
   private startPing(replica: Replica): void {
     clearInterval(replica.ping);
-    replica.ping = setInterval(() => void this.refresh(replica), this.glue.pingIntervalMs);
+    replica.ping = setInterval(() => void this.ping(replica), this.glue.pingIntervalMs);
     replica.ping.unref();
   }
 
@@ -551,6 +762,11 @@ export class ExternalCore {
     await rpc.waitExit(5000);
   }
 
+  /**
+   * The process ended. Expected (shutdown, a replaced process) → nothing.
+   * Otherwise (protocol §8): `exited` with the last stderr lines, the replica
+   * in `error`, and a restart if the policy allows.
+   */
   private onExit(
     replica: Replica,
     rpc: StdioRpc,
@@ -560,8 +776,61 @@ export class ExternalCore {
     if (replica.rpc !== rpc) return;
     clearInterval(replica.ping);
     replica.ready = false;
-    if (replica.ending) return;
-    this.setReplicaState(replica, 'error', `exited (${signal ?? `code ${code ?? '?'}`})`);
+    if (replica.ending || !this.replicas.includes(replica)) return;
+    replica.resume ||= replica.state === 'running' || replica.state === 'starting';
+    const how = signal ?? `code ${code ?? '?'}`;
+    this.deps.bus.emit({
+      core: this.id,
+      replica: replica.id,
+      kind: 'testbed.core.process.exited',
+      level: 'warn',
+      actor: 'system',
+      summary: `${this.id} ${replica.id} exited unexpectedly (${how}, pid ${rpc.pid})`,
+      payload: {
+        pid: rpc.pid,
+        code,
+        signal,
+        stderr: replica.stderr.slice(-STDERR_ON_EXIT),
+      },
+    });
+    this.setReplicaState(replica, 'error', `exited (${how})`);
+    this.scheduleRestart(replica);
+  }
+
+  /**
+   * `restart: 'on-failure'`: wait 1 s × 2^(attempt − 1) (≤ 30 s), spawn again
+   * and, if it was running, start it. Past `maxRestarts`: stay in `error`.
+   */
+  private scheduleRestart(replica: Replica): void {
+    if (this.glue.restart === 'never' || replica.restartTimer !== undefined) return;
+    if (replica.restarts >= this.glue.maxRestarts) {
+      this.setReplicaState(replica, 'error', 'restart limit reached');
+      return;
+    }
+    replica.restarts += 1;
+    const attempt = replica.restarts;
+    const waitMs = Math.min(this.backoffMs * 2 ** (attempt - 1), RESTART_MAX_MS);
+    this.deps.bus.emit({
+      core: this.id,
+      replica: replica.id,
+      kind: 'testbed.core.process.restarting',
+      level: 'warn',
+      actor: 'system',
+      summary: `${this.id} ${replica.id} restarting in ${waitMs}ms (attempt ${attempt} of ${this.glue.maxRestarts})`,
+      payload: { attempt, waitMs, maxRestarts: this.glue.maxRestarts },
+    });
+    replica.restartTimer = setTimeout(() => {
+      replica.restartTimer = undefined;
+      void (async () => {
+        if (!this.replicas.includes(replica)) return;
+        if (!(await this.bringUp(replica))) {
+          this.scheduleRestart(replica);
+          return;
+        }
+        if (replica.resume) await this.startReplica(replica);
+      })();
+    }, waitMs);
+    replica.restartTimer.unref();
   }
 
   private onStderr(replica: Replica, line: string): void {
@@ -678,6 +947,12 @@ export class ExternalCore {
     replica.state = to;
     if (to === 'error') replica.detail = detail;
     else delete replica.detail;
+    if (to === 'running') {
+      replica.resume = false;
+      replica.runningSince = performance.now();
+    } else {
+      delete replica.runningSince;
+    }
     this.deps.bus.emit({
       core: 'testbed',
       replica: replica.id,

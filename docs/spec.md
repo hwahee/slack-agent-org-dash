@@ -1,15 +1,16 @@
 # testbed-base 스펙
 
-`testbed-base` 자체를 만드는 단계별 스펙입니다. 지금은 P0–P3을 다룹니다. 공통 규약은 [docs/testbed/](testbed/README.md)가 원본이고, 이 문서는 그 규약을 **이 저장소에 처음 구현하는 순서와 수용 기준**을 정합니다.
+`testbed-base` 자체를 만드는 단계별 스펙입니다. 지금은 P0–P4를 다룹니다. 공통 규약은 [docs/testbed/](testbed/README.md)가 원본이고, 이 문서는 그 규약을 **이 저장소에 처음 구현하는 순서와 수용 기준**을 정합니다.
 
 ## 변경 이력
 
-| 날짜       | 바뀐 절                                                                                                                      | 영향받는 마일스톤 |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| 2026-11-24 | 11절: P2(M5–M6 MCP 어댑터, 스모크)와 P3(M7–M10 대시보드, UI 자동화) 추가. 10절, 12절, 13절 갱신(13절 1번은 M1 성공으로 삭제) | M5–M10            |
-| 2026-11-24 | 2절: M1 결과(MCP SDK 1.32.2, 웹 표준 전송을 `Bun.serve`에 바로 붙임)                                                         | M1, P2            |
-| 2026-11-24 | 11절 M0: 데모 제거 업그레이드 가이드(보일러플레이트 머지 때 충돌 해결 원칙) 추가                                             | M0                |
-| 2026-11-24 | 최초 작성(P0–P1)                                                                                                             | M0–M4             |
+| 날짜       | 바뀐 절                                                                                                                                                                                                                                                                    | 영향받는 마일스톤 |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 2026-11-25 | 11절: P4(M11–M14 외부 프로세스 코어, 감시·복제, Python 참조 구현, 표면 반영) 추가. 3절(예제 코어), 12절 갱신. `testbed/external-core-protocol.md` 개정(initialize에서 설정 분리, 설정 필드, 오류 변환, 감시 이벤트, 언어 간 재현성), `testbed/ports.md`에 40002–40008 등록 | M11–M14           |
+| 2026-11-24 | 11절: P2(M5–M6 MCP 어댑터, 스모크)와 P3(M7–M10 대시보드, UI 자동화) 추가. 10절, 12절, 13절 갱신(13절 1번은 M1 성공으로 삭제)                                                                                                                                               | M5–M10            |
+| 2026-11-24 | 2절: M1 결과(MCP SDK 1.32.2, 웹 표준 전송을 `Bun.serve`에 바로 붙임)                                                                                                                                                                                                       | M1, P2            |
+| 2026-11-24 | 11절 M0: 데모 제거 업그레이드 가이드(보일러플레이트 머지 때 충돌 해결 원칙) 추가                                                                                                                                                                                           | M0                |
+| 2026-11-24 | 최초 작성(P0–P1)                                                                                                                                                                                                                                                           | M0–M4             |
 
 ## 1. 목적
 
@@ -35,10 +36,12 @@
 
 ## 3. 구성
 
-| 코어 id  | 유형      | 실행    | 복제 | 데이터면                    |
-| -------- | --------- | ------- | ---- | --------------------------- |
-| `sample` | `passive` | in-proc | 1    | TCP `40001` (`SAMPLE_PORT`) |
+| 코어 id               | 유형      | 실행         | 복제                     | 데이터면                                 |
+| --------------------- | --------- | ------------ | ------------------------ | ---------------------------------------- |
+| `sample`              | `passive` | in-proc      | 1                        | TCP `40001` (`SAMPLE_PORT`)              |
+| `py-echo` (예제, M13) | `passive` | 외부(Python) | 1–7 (`PY_ECHO_REPLICAS`) | TCP `40002` + 복제 번호 (`PY_ECHO_PORT`) |
 
+- `py-echo`는 외부 코어 참조 구현의 예제입니다. 외부 프로세스를 쓰는 이유는 "다른 언어 SDK"의 자리 표시(Python 어댑터 시연)입니다. `TESTBED_EXAMPLE_CORES=py-echo`일 때만 등록됩니다.
 - 포트 블록: `40000–40009`([testbed/ports.md](testbed/ports.md)에 등록됨). `PORT` 기본값은 `40000`.
 
 ## 4. 상호작용 프로토콜 (샘플 코어)
@@ -543,10 +546,163 @@ P3(M7–M10)에서 만듭니다. 영역, 패널 슬롯, 편집 잠김 래퍼, te
 | `testbed.runs.start` / `.end` / `.item(runId)` / `.summary`               | Run 탭                |
 | `testbed.agent-timeline` / `.item(eventId)`                               | 에이전트 타임라인     |
 
+### P4 공통 규칙
+
+- 프로토콜, 감시, 복제, 재현성의 원본은 [testbed/external-core-protocol.md](testbed/external-core-protocol.md)입니다. 이 절은 그 규약을 구현하는 순서와 수용 기준을 정합니다.
+- 외부 코어도 제어 서비스에서는 in-proc 코어와 똑같이 보입니다. REST·MCP·대시보드는 외부 코어를 위해 따로 분기하지 않습니다. 복제 지정(`replica`)과 프로세스 정보만 추가로 다룹니다.
+- 시험용 외부 코어는 두 가지입니다.
+  - **가짜 코어**(M11–M12): `bun`으로 실행하는 TypeScript 스크립트. 환경 변수 `FAKE_MODE`로 일부러 잘못 동작합니다(아래 표). 공통 런타임 시험 전용이며 Python이 없어도 돕니다.
+  - **py-echo**(M13–M14): Python 참조 구현의 예제 코어.
+
+  | `FAKE_MODE`         | 동작                                                    |
+  | ------------------- | ------------------------------------------------------- |
+  | `normal`            | 규약대로 동작. 액션 `echo {text}` → `{ text, replica }` |
+  | `crash-after-start` | `start`에 응답한 뒤 종료 코드 3으로 끝남                |
+  | `hang-status`       | `status`에 응답하지 않음                                |
+  | `bad-stdout`        | 프로토콜이 아닌 줄과 1 MiB를 넘는 줄을 stdout에 씀      |
+  | `wrong-kind`        | `initialize`에서 선언과 다른 `kind`를 돌려줌            |
+  | `reserved-field`    | 설정 스키마에 `replicas` 필드를 둠                      |
+  | `slow-action`       | 액션 응답을 `requestTimeoutMs`보다 늦게 줌              |
+  | `ignore-shutdown`   | `shutdown`에 응답하고도 끝나지 않음(SIGTERM도 무시)     |
+  | `print-env`         | 받은 환경 변수 이름 목록을 `event` payload로 보냄       |
+
+### M11 — P4-a: 외부 코어 기반(복제 1개)
+
+**범위**
+
+- `defineExternalCore`(protocol §2)와 코어 호스트 연결. 외부 코어는 부팅 때 프로세스를 띄워 `initialize` → 설정 검증 → `applyConfig` → `autoStart`면 `start`.
+- JSON Schema → 검증기 변환을 `@shared/validation` 파사드에 추가합니다(`fromJsonSchema`). zod의 기능으로 되면 그것을 쓰고, 안 되면 검증 라이브러리 하나를 추가합니다. 어느 쪽인지 2절에 기록합니다.
+- stdio 전송: NDJSON, 한 줄 1 MiB, stdout·stderr 처리, stderr 최근 50줄 보관.
+- 요청 전부(`initialize` … `shutdown`)와 알림 전부(`event`, `fault`, `state`, `log`)의 처리.
+- 오류 변환(`CORE_ERROR` 502, `CORE_TIMEOUT` 504), `requestTimeoutMs`.
+- 환경 변수 전달 규칙(넘기는 것만 넘김).
+- 서버 종료 흐름: `stop` → `shutdown` → `shutdownGraceMs` 뒤 SIGTERM → SIGKILL.
+- `testbed.core.process.spawned` 이벤트.
+- `initialize`가 실패한 코어도 매니페스트에는 나옵니다(선언의 `id`·`kind`·`title`, `state: 'error'`, `detail`에 이유, 액션 없음). `start`를 부르면 프로세스를 다시 띄워 시도합니다.
+
+**같은 PR에서 고칠 문서**
+
+- `docs/testbed/control-plane.md` §3 오류 코드 표: `CORE_ERROR`, `CORE_TIMEOUT`.
+- `docs/testbed/events.md` §2.1 예약 kind 표: `testbed.core.process.*`.
+- `docs/testbed/core-contract.md`: 외부 코어 선언으로 가는 안내 한 줄.
+
+**수용 기준** (모두 `bun test`, 가짜 코어 사용)
+
+- `normal`: 부팅 후 상태 `running`, `testbed.core.process.spawned`(pid). 매니페스트의 `configSchema`·`actions`가 `initialize` 응답과 같음. `echo {text:'hi'}` → `{ text: 'hi', replica: 'r0' }`. 가짜 코어가 보낸 `event`가 `core`·`replica: 'r0'`가 채워진 봉투로 남음. `fault` 알림 → `testbed.fault.injected`.
+- 설정 패치가 `initialize`의 스키마로 검증됨(범위 밖 값 → `VALIDATION_ERROR`).
+- `stop` → 상태 `stopped`, 프로세스는 살아 있음(pid 같음). `start` → 다시 `running`, 같은 pid.
+- Run을 열고 닫을 때마다 가짜 코어가 `runChanged`를 받고, `seed`가 `<Run seed>:r0`.
+- `wrong-kind`·`reserved-field` → 그 코어는 `error`, `detail`에 이유, 다른 코어(`sample`)는 정상.
+- `bad-stdout` → 두 줄 모두 버려지고 `warn` 로그, 코어는 계속 `running`.
+- `slow-action` → 액션 호출이 `CORE_TIMEOUT`(504), 코어는 계속 `running`.
+- 가짜 코어가 `error.data.code: 'OOPS'`로 실패 → `CORE_ERROR`(502), `details.coreCode: 'OOPS'`. `code: 'VALIDATION_ERROR'`면 400 그대로.
+- `print-env` → 받은 변수에 `PATH`와 `FAKE_*`가 있고 `TESTBED_CONTROL_TOKEN`이 없음(시험에서 값을 설정해 둔 상태).
+- 존재하지 않는 명령 → `error`, `detail`에 `ENOENT`. 매니페스트에 그 코어가 나옴.
+- 서버 종료 → 가짜 코어 프로세스가 남지 않음. `ignore-shutdown`이어도 `shutdownGraceMs`×2 안에 SIGKILL로 끝남.
+- `bun run check` 통과.
+
+### M12 — P4-b: 감시, 재시작, 복제
+
+**범위**
+
+- 감시 전부(protocol §8): 응답 확인과 `unresponsive`, 비정상 종료와 `exited`(stderr 마지막 20줄), 재시작 백오프, 60초 안정 후 횟수 초기화, `maxRestarts`, `restart: 'never'`, `start`로 다시 띄우기.
+- 복제(protocol §6): `replicas` N개, 복제별 seed, 전체 상태·카운터·엔드포인트(`replica` 표시) 합치기, 복제 수 변경은 `restart-required`이고 다음 `stop` → `start`에서 늘리거나 줄임.
+- 액션 복제 지정: 제어 서비스 `invokeAction`이 `replica`를 받습니다. REST는 `POST /cores/:core/actions/:name?replica=r1`, MCP는 외부 코어의 액션 도구 입력에 선택 속성 `replica`(문자열)를 덧붙입니다. 모두 보낼 때의 결과 모양은 protocol §6.
+- 공유 타입: `CoreStatus`에 `external?: true`와 `replicas?: ReplicaStatus[]`(`{ id, state, detail?, pid?, restarts, lastPingMs?, counters, endpoints }`), `CoreEndpoint`에 `replica?`. 매니페스트의 `replicas`는 설정값, 코어마다 `external` 표시.
+- 재시작 백오프의 시작 간격과 안정 시간(60초)은 시험에서 줄일 수 있게 코어 호스트 옵션으로 받습니다. 설정 필드로는 노출하지 않습니다.
+
+**같은 PR에서 고칠 문서**
+
+- `docs/testbed/control-plane.md`: `invokeAction`의 `replica`, REST `?replica`, MCP 액션 도구의 `replica` 속성, 매니페스트의 `external`·`replicas`.
+- `docs/testbed/core-contract.md` §3: `CoreStatus.replicas`.
+
+**수용 기준** (모두 `bun test`, 가짜 코어 사용. 시험용으로 `pingIntervalMs: 1000`, `pingTimeoutMs: 200`, 백오프 시작 100ms, 안정 시간 1초)
+
+- `hang-status` → 약 3초 안에 `unresponsive` → `exited` → `restarting`(시도 1, 대기 100ms) → 다시 띄움. `maxRestarts: 2`면 세 번째 실패 후 `error`, `detail: 'restart limit reached'`, 더 띄우지 않음. 그 뒤 `start` → 횟수 0으로 다시 띄움.
+- `crash-after-start` → `exited`(종료 코드 3, stderr 마지막 줄 포함) → 재시작 후 다시 `running`이 되었다가 다시 끝남. 백오프 대기가 100 → 200 → 400ms로 늘어남.
+- `normal`로 띄운 프로세스를 시험이 직접 kill → 재시작되고, 종료 전 `running`이었으므로 `start`까지 되어 `running`. 1초 안정 후 재시작 횟수가 0.
+- `restart: 'never'` + `crash-after-start` → `error`로 남고 다시 띄우지 않음.
+- `replicas: 3` → pid가 다른 프로세스 3개, `replicaId` `r0`–`r2`, seed가 `<seed>:r0`…`<seed>:r2`. `status`의 전체 카운터가 복제 합. 하나를 kill하면 그동안 전체 상태가 `running`이 아님(재시작 중 상태), 돌아오면 `running`.
+- `echo {text:'a'}`(복제 지정 없음, 3개) → `{ r0: {...}, r1: {...}, r2: {...} }`. `?replica=r1`(REST)·`replica: 'r1'`(MCP) → r1의 출력만. `replica: 'r9'` → `VALIDATION_ERROR`. 복제 하나가 `slow-action`이면 그 자리만 `{ error: { code: 'CORE_TIMEOUT' } }`, 전체는 성공.
+- `replicas`를 3 → 1로 패치 → `restart-required`. `stop` → `start` 후 프로세스 1개(r1·r2는 `shutdown`으로 끝남).
+- `bun run check` 통과.
+
+### M13 — P4-c: Python 참조 구현과 py-echo
+
+**범위**
+
+- **어댑터** `examples/python-core/testbed_core/`(Python 3.11 이상, 표준 라이브러리만, `asyncio`):
+  - stdio NDJSON JSON-RPC 처리, 요청 메서드 전부, 알림 보내기(`emit`, `fault`, `state`, `log`).
+  - 코어 작성 틀: 코어가 `kind`, `title`, 설정 스키마(JSON Schema), `default_config(env)`, `faults`, 액션(이름·설명·입출력 스키마·`mutating`·처리 함수), `start`/`stop`/`reset`/`apply_config`/`status`를 정의하면 나머지를 어댑터가 합니다. 공통 필드(`autoStart`, `eventLevel`, `faults`)는 어댑터가 스키마에 넣습니다.
+  - `SeededRng`과 `FaultDecider`를 protocol §9 그대로 구현합니다.
+  - 처리하지 못한 예외는 JSON-RPC 오류(`data.code: 'INTERNAL'`)로 돌려주고 stderr에 traceback을 씁니다. 프로세스는 끝내지 않습니다.
+- **py-echo** `examples/python-core/echo_core.py`와 선언 `examples/python-core/index.ts`(`defineExternalCore`):
+  - `passive`. 샘플 코어의 TCP echo와 같은 동작을 줄인 것입니다: 받은 조각을 그대로 돌려보냄, `maxChunkBytes` 초과 시 닫음, 결함 `delay`·`disconnect`·`corrupt`(XOR `0xFF`), 액션 `broadcast {text}` → `{ sent }`.
+  - 포트: `port`(env `PY_ECHO_PORT`, 기본 `40002`) + `replicaIndex`. `port`가 `0`이면 모든 복제가 임의 포트. 엔드포인트 이름은 `echo`.
+  - 이벤트: `py-echo.connection.opened`, `py-echo.data.echoed`(`latencyMs` 포함), `py-echo.connection.closed`, `py-echo.broadcast.sent`. summary 형식은 샘플 코어(6절)와 같습니다.
+  - 설정: `port`(0–65535), `maxChunkBytes`(1–1048576, 기본 65536), 공통 필드. `port` 변경은 `restart-required`.
+- **켜는 방법**: 공통 환경 변수 `TESTBED_EXAMPLE_CORES`(쉼표 목록, 기본 빈 값)에 `py-echo`를 넣으면 코어 호스트가 등록합니다. 예제 코어 목록은 공통 런타임이 `examples/`에서 모읍니다. 기본 이미지와 기본 실행에는 들어가지 않습니다.
+- **스모크**: 러너가 `examples/*/smoke/*.smoke.ts`도 읽습니다. `examples/python-core/smoke/py-echo.smoke.ts`(`requires: { cores: ['py-echo'] }`): 각 복제 엔드포인트에 echo → `py-echo.data.echoed`가 복제 수만큼(`replica`별 1건) → `py_echo_broadcast` → 결함 `disconnect` 한 번.
+- **시험 환경**
+  - Python 시험: `examples/python-core/tests/`(`unittest`), `bun run test:python`으로 실행.
+  - Bun 통합 시험 중 Python이 필요한 것은 `python3`(3.11 이상)이 없으면 건너뛰고 이유를 출력합니다. `TESTBED_REQUIRE_PYTHON=1`이면 건너뛰지 않고 실패합니다.
+  - CI: `actions/setup-python`(3.11) → `bun run test:python` → `TESTBED_REQUIRE_PYTHON=1 bun test` → 기존 스모크에 더해 `TESTBED_EXAMPLE_CORES=py-echo PY_ECHO_REPLICAS=2 bun run testbed:smoke`.
+- `tsconfig.json`의 `include`와 `knip.json`의 `entry`·`project`에 `examples/**/*.ts`를 추가합니다.
+- `examples/python-core/README.md`: Python으로 외부 코어를 만드는 법(파일 구성, 코어 작성 틀, 선언, 켜는 법, 시험), 테스트베드 이미지에 Python을 넣는 Dockerfile 예시(런타임 단계에 `python3` 설치와 `examples/` 복사).
+
+**같은 PR에서 고칠 문서**
+
+- `docs/testbed/architecture.md` §7: `TESTBED_EXAMPLE_CORES`.
+- `docs/testbed/verification.md`: Python 시험과 `TESTBED_REQUIRE_PYTHON`, 예제 코어 스모크.
+- `docs/testbed/external-core-protocol.md` §10: 어댑터 사용법 요약과 README 링크.
+
+**수용 기준**
+
+- `bun run test:python` 통과: 어댑터의 메시지 처리, 예외 → `INTERNAL` 오류, 결함 판정, py-echo 단위 동작.
+- **언어 간 재현성** (`bun test`, Python 필요): seed 5개(빈 문자열, ASCII, 한글 포함, 64자, `abc:r1`)마다 Bun `SeededRng`과 Python 구현의 처음 1000개 `next()`와 `int(0, 999)` 결과가 같음. 같은 규칙·selector 순서 100개에서 Bun `FaultDecider`와 Python 결정 순서(규칙 id, `delayMs`)가 같음(`probability`·`times`·`delayMs` 범위를 섞은 규칙으로).
+- `TESTBED_EXAMPLE_CORES=py-echo PY_ECHO_PORT=0 PY_ECHO_REPLICAS=2`로 띄운 통합 시험: 복제 2개 `running`, 엔드포인트 2개(`replica` 표시). 각 엔드포인트로 보낸 바이트가 그대로 돌아옴. 이벤트에 `replica` `r0`·`r1`. `disconnect` 규칙 → 연결이 닫히고 `testbed.fault.injected`. `py-echo` 프로세스를 kill → 재시작되어 다시 echo 됨.
+- 같은 Run seed로 `probability: 0.5` 규칙을 둔 채 py-echo에 같은 순서로 20번 보내기를 두 번 하면 두 번의 결함 적용 순서가 같음.
+- `TESTBED_EXAMPLE_CORES`가 비어 있으면 매니페스트에 `py-echo`가 없고 py-echo 스모크는 `SKIP`.
+- CI 워크플로에 Python 단계와 예제 코어 스모크가 있음.
+- `bun run check` 통과.
+
+### M14 — P4-d: 표면 반영(MCP, REST, 대시보드)
+
+**범위**
+
+- **이벤트 필터 `replica`**: 제어 서비스 필터에 추가하고 REST `GET /events?replica=`, MCP `query_events`·`wait_for`·`check`, 대시보드 이벤트 로그 필터에 반영합니다.
+- **코어 로그**: 제어 서비스 `getCoreLog(core, replica?)` → 복제마다 stderr 최근 50줄(가림 적용). REST `GET /testbed/api/cores/:core/log?replica=`, MCP 공통 도구 `get_core_log {core, replica?}`(읽기 전용). in-proc 코어는 빈 목록과 "in-proc 코어는 프로세스 로그가 없음" 문장을 돌려줍니다.
+- **`testbed_info`**: 외부 코어 줄에 복제 수와 복제별 상태를 덧붙입니다(`py-echo running x2 (r0 running pid 123, r1 running pid 124)`).
+- **대시보드**
+  - 코어 카드: 외부 코어면 "외부 프로세스" 표시와 복제 표(id, 상태, pid, 재시작 횟수, 마지막 응답 ms, 엔드포인트). 행을 펼치면 stderr 최근 50줄(`get_core_log`와 같은 REST).
+  - 액션 폼: 외부 코어면 대상 선택(전체 / r0 / r1 …). 결과가 복제별이면 복제별로 나눠 보여 줌.
+  - 이벤트 로그: `replica` 열(값이 있을 때만)과 필터.
+  - 상태 바의 코어 점은 전체 상태를 쓰고, `aria-label`에 복제 수를 덧붙임.
+- **testid**: `testbed.core-card.replicas(id)`, `testbed.core-card.replica(id, replicaId)`, `testbed.core-card.replica-log(id, replicaId)`, `testbed.action.target(core, name)`, `testbed.event-log.filter.replica`.
+- **UI 자동화 9번**(Python 필요, CI에서는 필수): `TESTBED_EXAMPLE_CORES=py-echo PY_ECHO_REPLICAS=2`로 띄운 대시보드 → 코어 카드에 복제 2행 `running` → 시험이 r1 프로세스를 kill → r1 행이 `running`이 아닌 상태를 거쳐 다시 `running`, 재시작 횟수 1 → r1 행을 펼치면 로그가 보임 → 액션 폼 대상 `r0`로 `broadcast` → 결과에 r0만.
+- `bun run test:ui`는 Python이 없으면 9번을 건너뛰고, `TESTBED_REQUIRE_PYTHON=1`이면 실패합니다. CI의 UI 자동화 단계는 `TESTBED_REQUIRE_PYTHON=1`로 돌립니다.
+
+**같은 PR에서 고칠 문서**
+
+- `docs/testbed/control-plane.md`: 필터 `replica`, `getCoreLog`, REST 경로, 공통 도구 16개 표.
+- `docs/testbed/dashboard.md`: 코어 카드의 복제 표와 로그, 액션 대상 선택.
+- `docs/ui-automation.md`: 위 testid.
+- `docs/testbed/verification.md`: 공통 점검이 부르는 도구 수(16개).
+
+**수용 기준**
+
+- MCP 통합 시험: `tools/list`에 공통 도구 16개. `get_core_log {core:'sample'}` → 빈 목록과 안내 문장. 가짜 코어에서 stderr에 쓴 줄이 `get_core_log`에 나오고, 비밀값 형태(`Authorization: Bearer …`)는 가려짐. `query_events {replica:'r1'}` → r1 이벤트만.
+- REST 통합 시험: `GET /events?replica=r0`, `GET /cores/:core/log?replica=r0`.
+- 스모크 공통 점검이 16개 도구를 모두 부름(`bun run testbed:smoke` 통과).
+- `bun run test:ui` 1–9번 통과(CI에서 9번 포함).
+- `bun run check` 통과.
+
 ## 12. 범위 밖
 
-- 외부 프로세스 코어, 복제, 감시, Python 참조 구현 (P4 — Bun으로 만들 수 없는 코어가 처음 필요해질 때)
-- 원격 워커 (P5 — 첫 클라우드 부하 테스트베드가 생길 때)
+- 원격 워커와 docker compose 코어(WS 전송 `/testbed/workers`) (P5 — 첫 클라우드 부하 테스트베드가 생길 때)
+- 기본 Docker 이미지에 Python을 넣는 것(외부 코어를 쓰는 테스트베드가 자기 Dockerfile에서 넣음. 방법은 M13의 README)
+- Python 외 언어의 참조 어댑터
+- 복제 하나만 골라 다시 시작하는 조작(감시의 자동 재시작과 코어 단위 `stop`·`start`만 둠)
 - `active`·`scenario` 유형의 공통 지원(단계 실행기 등) — 첫 active·scenario 테스트베드가 생길 때
 - `docs/agent-usage.md` — 각 테스트베드 레포의 M4 산출물
 - 대시보드에서 제어 락을 잡거나 강제로 푸는 기능(설계상 두지 않음)

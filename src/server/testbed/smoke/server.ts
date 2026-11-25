@@ -4,6 +4,7 @@
  * data-plane port at 0. Resolves once `/api/health/ready` answers 200.
  */
 import { CORES } from '../cores';
+import { EXAMPLE_CORES } from '../examples';
 import { REPO_ROOT } from './load';
 
 const READY_TIMEOUT_MS = 30_000;
@@ -27,10 +28,13 @@ function freePort(): number {
   return port;
 }
 
-/** `<CORE_ID>_PORT=0` for every registered core (docs/testbed/architecture.md §7). */
+/** `<CORE_ID>_PORT=0` for every core, the example cores included (docs/testbed/architecture.md §7). */
 function corePortsAtZero(): Record<string, string> {
   return Object.fromEntries(
-    CORES.map((core) => [`${core.id.toUpperCase().replaceAll('-', '_')}_PORT`, '0']),
+    [...CORES, ...EXAMPLE_CORES].map((core) => [
+      `${core.id.toUpperCase().replaceAll('-', '_')}_PORT`,
+      '0',
+    ]),
   );
 }
 

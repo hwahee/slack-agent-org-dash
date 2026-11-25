@@ -17,7 +17,14 @@ describe('loadTestbedConfig', () => {
       leaseTtlSec: 600,
       mcpMaxSessions: 32,
       mcpSessionIdleSec: 3600,
+      exampleCores: [],
     });
+  });
+
+  test('TESTBED_EXAMPLE_CORES is a comma list', () => {
+    expect(
+      loadTestbedConfig({ TESTBED_EXAMPLE_CORES: ' py-echo, ,other ' }, 0).exampleCores,
+    ).toEqual(['py-echo', 'other']);
   });
 
   test('reads the env, and empty values mean the default', () => {

@@ -16,6 +16,7 @@
     "test:ui": "bun run scripts/test-ui.ts",
     "start": "cd dist && bun index.js",
     "test": "bun test",
+    "test:python": "cd examples/python-core && python3 -m unittest discover -s tests -t .",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

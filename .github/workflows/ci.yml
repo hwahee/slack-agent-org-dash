@@ -21,6 +21,11 @@ jobs:
         with:
           node-version-file: package.json
 
+      # The Python reference core (examples/python-core, docs/spec.md §11 M13).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -36,13 +41,26 @@ jobs:
       - name: Knip (unused files/exports/dependencies)
         run: bun run knip
 
+      - name: Python adapter tests
+        run: bun run test:python
+
+      # TESTBED_REQUIRE_PYTHON=1: the tests that need python3 fail instead of skipping.
       - name: Tests (unit + API integration, in-memory DB)
         run: bun test
+        env:
+          TESTBED_REQUIRE_PYTHON: '1'
 
       # Boots this repo's server on a free port and runs the MCP smoke
       # (docs/testbed/verification.md §4).
       - name: MCP smoke
         run: bun run testbed:smoke
+
+      # The same smoke with the example core py-echo on, two replicas.
+      - name: MCP smoke (example cores)
+        run: bun run testbed:smoke
+        env:
+          TESTBED_EXAMPLE_CORES: py-echo
+          PY_ECHO_REPLICAS: '2'
 
       # UI automation (docs/testbed/verification.md §5): Chromium only.
       - name: Install Playwright Chromium

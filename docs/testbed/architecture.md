@@ -127,9 +127,11 @@ env는 **부팅 기본값**만 정합니다. 실행 중 변경은 제어 API로 
 | `TESTBED_MAX_PAYLOAD_BYTES`    | `16384`                                | 이벤트 payload 상한(bytes)                                        |
 | `TESTBED_MCP_MAX_SESSIONS`     | `32`                                   | 동시에 열 수 있는 MCP 세션 수. 넘으면 새 `initialize`가 503       |
 | `TESTBED_MCP_SESSION_IDLE_SEC` | `3600`                                 | 이 시간(초) 동안 요청이 없는 MCP 세션은 서버가 닫음(쥔 락도 풀림) |
+| `TESTBED_EXAMPLE_CORES`        | (비움)                                 | 함께 등록할 예제 코어(쉼표 목록, 예: `py-echo`). 아래 참고        |
 | `<CORE_ID>_*`                  | –                                      | 코어별. 예: `ECHO_PORT`, `LLM_DEFAULT_MODEL`                      |
 
 - 제품이 다른 머신에 있으면 `TESTBED_BIND_HOST=0.0.0.0`과 `TESTBED_PUBLIC_URL`을 함께 바꿉니다.
+- `TESTBED_EXAMPLE_CORES`: 예제 코어는 `examples/<예제>/`에 있고, 공통 런타임(`src/server/testbed/examples.ts`)이 목록을 모읍니다. 이름을 넣은 것만 테스트베드의 코어(`cores/index.ts`) 뒤에 등록되며, 모르는 이름이면 부팅이 실패합니다. 기본 이미지와 기본 실행에는 들어가지 않습니다. 지금 있는 예제는 `py-echo`(Python 외부 코어, [external-core-protocol.md](external-core-protocol.md) §10)뿐입니다.
 
 ## 8. 배포와 다중 인스턴스
 

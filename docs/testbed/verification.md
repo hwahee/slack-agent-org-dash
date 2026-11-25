@@ -28,6 +28,13 @@
 - 시간에 기대는 시험은 이벤트를 기다립니다(`waitFor`). `sleep`으로 기다리지 않습니다.
 - 결함 주입은 종류마다 하나 이상의 시험을 둡니다.
 
+### 3.1 Python이 필요한 시험
+
+- 외부 코어의 Python 참조 구현(`examples/python-core/`)은 Python 3.11 이상이 있어야 시험할 수 있습니다.
+  - `bun run test:python`: 어댑터와 py-echo의 Python 단위 시험(`examples/python-core/tests/`, `unittest`).
+  - `bun test` 중 Python이 필요한 것(언어 간 재현성, py-echo 통합)은 `examples/python-core/python.ts`의 `describePython`으로 묶습니다. `python3`(3.11 이상)이 없으면 이유를 출력하고 건너뜁니다.
+  - `TESTBED_REQUIRE_PYTHON=1`이면 건너뛰지 않고 실패합니다. CI는 이 값으로 `bun test`를 돌립니다.
+
 ## 4. MCP 스모크 — `bun run testbed:smoke`
 
 구현은 `src/server/testbed/smoke/`(실행기), `scripts/testbed-smoke.ts`(명령)입니다.
@@ -48,7 +55,7 @@
 ### 4.2 순서
 
 1. **공통 점검**(`common`, 모든 테스트베드에서 같음): 공통 도구 15개를 모두 한 번 이상 부르고, 두 세션 사이의 락 배타성(`LEASE_HELD`), 락 보유 중 사람 REST 조작의 423, `release_control` 뒤 해제를 확인합니다. 코어를 stop → start → reset 하므로 포트 `0`으로 연 데이터면은 새 포트가 됩니다.
-2. **시나리오**: `src/server/testbed/cores/*/smoke/*.smoke.ts`를 시나리오 이름순으로 실행합니다. 시나리오마다 매니페스트를 새로 읽고(데이터면 주소가 바뀌었을 수 있음) 새 MCP 세션을 씁니다.
+2. **시나리오**: `src/server/testbed/cores/*/smoke/*.smoke.ts`와 예제 코어의 `examples/*/smoke/*.smoke.ts`를 시나리오 이름순으로 실행합니다. 예제 코어 시나리오는 `TESTBED_EXAMPLE_CORES`로 그 코어를 켜지 않으면 `requires`로 `SKIP`입니다. 시나리오마다 매니페스트를 새로 읽고(데이터면 주소가 바뀌었을 수 있음) 새 MCP 세션을 씁니다.
 3. **액션 커버리지**: 매니페스트에서 MCP에 노출된 액션(`<core>_<action>`)이 건너뛰지 않은 시나리오에서 한 번 이상 불렸는지(`t.call`·`t.callError`) 확인합니다. 안 불린 액션이 있으면 실패입니다.
 
 - 각 시나리오(공통 점검 포함)가 끝나면 통과·실패와 관계없이 정리합니다: 열린 Run이 있으면 그 시나리오의 세션으로 `end_run`, 모든 세션 `release_control` 후 세션 종료(`DELETE`), 연 TCP 연결 닫기.
@@ -105,7 +112,7 @@ total: 3 pass, 1 fail, 1 skip; coverage PASS
 
 ### 4.5 CI
 
-- `ci.yml`의 `ci` job: 테스트 단계 뒤에 `bun run testbed:smoke`.
+- `ci.yml`의 `ci` job: `actions/setup-python`(3.11) → `bun run test:python` → `TESTBED_REQUIRE_PYTHON=1 bun test` → `bun run testbed:smoke` → 예제 코어를 켠 스모크(`TESTBED_EXAMPLE_CORES=py-echo PY_ECHO_REPLICAS=2 bun run testbed:smoke`).
 - 이미지 job(`main` push만): 이미지를 빌드하고(`load`), 컨테이너를 띄워(`-p 40000-40009:40000-40009`) `bun run testbed:smoke --url http://localhost:40000`이 통과해야 GHCR에 push합니다. 테스트베드 레포는 `IMAGE`와 포트 블록만 바꿉니다.
 
 ## 5. UI 자동화 — `bun run test:ui`

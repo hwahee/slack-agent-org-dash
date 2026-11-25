@@ -305,7 +305,25 @@ a {
 }
 
 .tb-layout[data-wide] {
-  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr) minmax(16rem, 22rem);
+  /* Percent, not fr, for the side columns: a minmax(…, 22rem) track grows to
+     its maximum before the main area gets anything, leaving the event log a
+     sliver at 1100 px. */
+  grid-template-columns: clamp(16rem, 25%, 22rem) minmax(0, 1fr) clamp(16rem, 25%, 22rem);
+}
+
+/* Each column scrolls on its own and stays in view: a long core column (the
+   connection panel, then the config and fault editors) no longer stretches
+   the page and carries the event log and the detail panel off screen. The
+   inline padding keeps focus rings and the kids skin's glow inside the
+   scroll box's clip edge. */
+.tb-layout[data-wide] > * {
+  position: sticky;
+  top: var(--space-3);
+  max-height: calc(100vh - 2 * var(--space-3));
+  max-height: calc(100dvh - 2 * var(--space-3));
+  margin-inline: calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-2);
+  overflow-y: auto;
 }
 
 .tb-layout__main,
@@ -588,7 +606,9 @@ a {
   position: absolute;
   inset-inline: 0;
   display: grid;
-  grid-template-columns: 7.5rem 3.5rem 4rem minmax(8rem, 14rem) minmax(0, 1fr);
+  /* kind by percent, not minmax(8rem, 14rem): that track would take its
+     maximum first and leave the summary nothing in a narrow main area. */
+  grid-template-columns: 7.5rem 3.5rem 4rem clamp(8rem, 30%, 14rem) minmax(0, 1fr);
   gap: var(--space-2);
   align-items: center;
   padding: 0 var(--space-2);
@@ -603,7 +623,7 @@ a {
 }
 
 .tb-log--replica .tb-log__row {
-  grid-template-columns: 7.5rem 3.5rem 4rem 2rem minmax(8rem, 14rem) minmax(0, 1fr);
+  grid-template-columns: 7.5rem 3.5rem 4rem 2rem clamp(8rem, 30%, 14rem) minmax(0, 1fr);
 }
 
 .tb-log__row > span {

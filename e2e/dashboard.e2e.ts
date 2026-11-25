@@ -217,3 +217,28 @@ test('8. agent timeline: an agent taking and giving back the lease', async ({ pa
     }),
   ).toBeVisible();
 });
+
+test('core card: start and stop are enabled only when they would do something', async ({
+  page,
+}) => {
+  await openDashboard(page);
+  const start = page.getByRole('button', { name: 'Start', exact: true });
+  const stop = page.getByRole('button', { name: 'Stop', exact: true });
+  const reset = page.getByRole('button', { name: 'Reset', exact: true });
+  await expect(start).toBeDisabled();
+  await expect(stop).toBeEnabled();
+  await expect(stop).toHaveClass(/btn--danger/);
+  await expect(reset).toBeEnabled();
+
+  await stop.click();
+  await expect(page.getByRole('img', { name: 'sample: stopped' })).toBeVisible();
+  await expect(stop).toBeDisabled();
+  await expect(stop).not.toHaveClass(/btn--danger/);
+  await expect(start).toBeEnabled();
+  await expect(reset).toBeEnabled();
+
+  await start.click();
+  await expect(page.getByRole('img', { name: 'sample: running' })).toBeVisible();
+  await expect(start).toBeDisabled();
+  await expect(stop).toBeEnabled();
+});

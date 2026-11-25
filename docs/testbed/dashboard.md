@@ -37,6 +37,7 @@
 - **카운터**: `status().counters` 그대로(외부 코어는 복제 합).
 - **복제 표**(외부 코어, `dashboard/replica-table.tsx`): 복제마다 한 행(id, 상태, pid, 재시작 횟수, 마지막 응답 ms, 엔드포인트). 행의 id 버튼을 누르면 그 아래에 stderr 최근 50줄(`GET /cores/:core/log?replica=`, 가림 적용)이 열리고, 열려 있는 동안 2초마다 다시 읽습니다.
 - **조작**: start / stop / reset(`POST /cores/:core/{op}`). 실패하면 오류 문장을 버튼 아래에 보여 줍니다.
+  - 지금 상태에서 아무 일도 하지 않을 조작은 `disabled`입니다(`dashboard/core-ops.ts`): start는 `idle`·`stopped`·`error`일 때만, stop은 `running`일 때만 켜집니다(`starting`·`stopping` 동안은 둘 다 꺼짐). 외부 코어는 복제 상태로 판단해, 내려간 복제가 하나라도 있으면 start, 도는 복제가 하나라도 있으면 stop이 켜집니다. reset은 언제나 켜져 있습니다. stop의 강조색(`danger`)은 켜져 있을 때만 씁니다.
 - **설정**: 코어가 `configForm`을 등록했으면 그 폼, 아니면 JSON 편집기(TextArea, 들여쓰기 2칸). 저장은 `PATCH /cores/:core/config`이고, `VALIDATION_ERROR`의 `details`를 `경로: 문장` 줄로 편집기 아래에 보여 줍니다. JSON이 아니면 보내지 않고 그 자리에서 알립니다. 결과가 `restart-required`면 "재시작해야 적용됨 · 지금 재시작" 안내와 버튼(stop → start)을 띄웁니다.
 - **액션**: `surfaces`에 `ui`가 있는 액션마다 버튼 하나. 누르면 액션 `description`과 `inputSchema`로 만든 폼이 열립니다(§1.4). 실행 결과(출력 JSON 또는 오류 문장)를 폼 아래에 보여 주고, 입력은 다음 실행을 위해 남겨 둡니다. `mutating: false` 액션은 락이 걸려도 실행할 수 있습니다.
   - 외부 코어면 폼 위에 대상 선택(전체 복제 / r0 / r1 …)이 있습니다(`?replica=`). 결과는 복제별로 나눠 보여 줍니다: 하나를 골랐으면 그 복제 하나, 전체면 `{ r0, r1, … }`의 자리마다(실패한 자리 `{ error }`는 오류 색).
@@ -121,7 +122,7 @@
   - 상태: `idle`(서버 값 표시) → `editing` → `locked`(락 또는 423, 입력 보존·읽기 전용) → 해제 시 서버 값을 다시 읽어 `base`와 같으면 `editing`, 다르면 `server-changed`. "다시 불러오기"는 서버 값으로(`idle`), "내 입력 유지"는 입력을 두고 새 서버 값을 `base`로 삼아 `editing`. 저장이 성공하면 `idle`.
   - 상태 전이는 React와 분리된 순수 함수(`lock-editor.ts`)라 단위 테스트로 확인합니다.
   - 서버 값을 다시 읽지 못하면 1초 뒤 한 번 더 읽고, 그래도 안 되면 마지막으로 알던 값과 비교합니다.
-- 조작 버튼(start/stop/reset, 저장, 액션 실행)은 `OperateButton`이며, 락이 걸리면 포커스는 받되 `aria-disabled="true"`이고 눌러도 아무 일도 하지 않습니다.
+- 조작 버튼(start/stop/reset, 저장, 액션 실행)은 `OperateButton`이며, 락이 걸리면 포커스는 받되 `aria-disabled="true"`이고 눌러도 아무 일도 하지 않습니다. 락과 별개로, 상태에 맞지 않는 조작(§1.2)은 `disabled` prop으로 진짜 `disabled`가 됩니다(락 여부와 상관없이).
 
 ## 3. 규칙
 

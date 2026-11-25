@@ -96,7 +96,7 @@
 | `testbed.open-cores` / `testbed.open-detail`                                                   | 1024px 미만에서 코어 열·상세를 여는 버튼                                                                                                        |
 | `testbed.cores-overlay` / `testbed.detail-overlay`                                             | 그때 열리는 사이드바·바텀시트(`.panel`, `.close` 파생)                                                                                          |
 
-- 락 상태는 `<html data-lease="none|agent|ci">`와 조작 컨트롤의 `aria-disabled="true"`로 관찰합니다.
+- 락 상태는 `<html data-lease="none|agent|ci">`와 조작 컨트롤의 `aria-disabled="true"`로 관찰합니다. 코어 상태에 맞지 않는 start/stop(`running` 코어의 start 등)은 락과 별개로 `disabled`입니다([testbed/dashboard.md](testbed/dashboard.md) §1.2).
 - 실시간 값은 WS로 100ms 묶음으로 들어오므로 고정 시간 대신 요소·속성의 변화를 기다립니다.
 
 `TextField`는 에러 표시 시 자동으로 `` `${testId}.error` `` 요소를 추가합니다. `TextArea`도 같고,

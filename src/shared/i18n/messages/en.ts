@@ -6,8 +6,8 @@
  * Interpolation uses `{name}` placeholders, resolved by `translate()`.
  */
 export const en = {
-  'app.title': 'Bun Fullstack Boilerplate',
-  'app.tagline': 'React · Bun · Bun server monorepo starter',
+  'app.title': 'Testbed',
+  'app.tagline': 'Attach a product, run it and watch what happens',
 
   'nav.designSystem': 'Design System',
 
@@ -52,6 +52,7 @@ export const en = {
   'testbed.connection.state.reconnecting': 'Reconnecting…',
   'testbed.connection.state.unauthorized': 'Sign-in required',
   'testbed.lease.banner': '{who} is in control · session {session} · {remaining} left',
+  'testbed.documentTitle': '{name} · Testbed',
   'testbed.restarted': 'The testbed restarted. You are now looking at the new instance.',
   'testbed.login.title': 'Sign-in required',
   'testbed.login.description': 'Sign in to watch and operate this testbed.',

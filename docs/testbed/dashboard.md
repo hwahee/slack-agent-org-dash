@@ -26,6 +26,7 @@
 
 - 1024px 이상에서 코어 열·주 영역·상세 패널은 각각 화면 높이까지만 차지하고 따로 스크롤하며, 페이지를 내려도 화면에 붙어 있습니다(`position: sticky`). 코어 카드를 길게 펼쳐 편집하는 동안에도 이벤트 로그와 상세 패널이 보입니다. 양옆 열의 폭은 전체의 25%를 16–22rem 사이로 맞춥니다.
 - 주 영역 탭은 이벤트 로그(`events`), 통계(`stats`), Run(`runs`), 에이전트 타임라인(`agent`), 그다음 코어 고유 패널(`<core>.<panel id>`) 순서입니다. 선택한 탭은 주소 `?tab=<id>`에 남습니다.
+- 브라우저 탭 제목은 매니페스트 이름으로 "`<name>` · 테스트베드"입니다(매니페스트를 받기 전에는 "Testbed"). 여러 테스트베드를 탭으로 띄워도 구분됩니다. 머리글과 푸터의 서비스명은 "테스트베드"(`app.title`)이고, 푸터의 관련 서비스는 `public/sitemap.json`(testbed-base, Boilerplate)입니다.
 - 상태 바: 이름, 버전, `instanceId` 앞 8자, 코어별 상태 점(전체 상태의 색 + `aria-label` "`<core>: <state>`", 외부 코어는 "`<core>: <state> (2 replicas)`"처럼 복제 수를 덧붙임), 열린 Run(label과 경과 시간, 1초마다 갱신), 실시간 연결 상태(연결 중 / 연결됨 / 다시 연결 중).
 - `AUTH_DRIVER=oidc`인데 로그인하지 않았으면 대시보드 대신 "로그인 필요" 안내와 보일러플레이트의 로그인 컨트롤을 보여 줍니다. 판정: WS가 아무 메시지 없이 닫히면 `GET /testbed/api/status`를 불러 보고, 401이면 로그인 필요로 보고 다시 연결하지 않습니다.
 - 구현: `src/client/testbed/dashboard/`(셸), `src/client/testbed/store/`(스토어), `src/client/testbed/registry.ts`(패널 슬롯), `src/client/testbed/connection.ts`(연결 패널 조각).

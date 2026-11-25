@@ -2,8 +2,8 @@ import type { MessageKey } from './en';
 
 /** Korean catalog. Must define exactly the keys of the English catalog. */
 export const ko: Record<MessageKey, string> = {
-  'app.title': 'Bun 풀스택 보일러플레이트',
-  'app.tagline': 'React · Bun · Bun server 모노레포 스타터',
+  'app.title': '테스트베드',
+  'app.tagline': '제품을 붙여 시험하고 지켜보는 곳',
 
   'nav.designSystem': '디자인 시스템',
 
@@ -48,6 +48,7 @@ export const ko: Record<MessageKey, string> = {
   'testbed.connection.state.reconnecting': '다시 연결 중…',
   'testbed.connection.state.unauthorized': '로그인 필요',
   'testbed.lease.banner': '{who}가 제어 중 · 세션 {session} · 남은 시간 {remaining}',
+  'testbed.documentTitle': '{name} · 테스트베드',
   'testbed.restarted': '테스트베드가 재시작됨. 지금은 새 인스턴스를 보고 있습니다.',
   'testbed.login.title': '로그인 필요',
   'testbed.login.description': '이 테스트베드를 보고 조작하려면 로그인하세요.',

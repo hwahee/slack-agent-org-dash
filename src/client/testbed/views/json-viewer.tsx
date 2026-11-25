@@ -1,7 +1,7 @@
 /**
- * A payload as a tree: objects and arrays fold and unfold, every value can
- * copy its path (`payload.lease.holder`, `payload.items[0]`), and values in
- * the common masking format are marked "redacted".
+ * A payload as a tree: objects and arrays fold and unfold, each line carries
+ * its path (`data-path="payload.lease.holder"`, `payload.items[0]`) for
+ * automation, and values in the common masking format are marked "redacted".
  */
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
@@ -9,7 +9,6 @@ import { useState } from 'react';
 import { useI18n } from '../../i18n/locale-context';
 import { TESTID } from '../../testing/testids';
 import { Badge } from '../../ui/badge';
-import { CopyButton } from '../dashboard/copy-button';
 import { isRedacted } from './event-display';
 
 function childPath(path: string, key: string | number): string {
@@ -45,7 +44,6 @@ function Node({
   path: string;
   depth: number;
 }) {
-  const { t } = useI18n();
   const [open, setOpen] = useState(depth < 2);
   const branch = typeof value === 'object' && value !== null;
   const entries: [string | number, unknown][] = branch
@@ -55,7 +53,7 @@ function Node({
     : [];
   return (
     <li className="tb-json__node">
-      <div className="tb-json__line">
+      <div className="tb-json__line" data-path={path}>
         {branch ? (
           <button
             type="button"
@@ -79,13 +77,6 @@ function Node({
             <Leaf value={value} />
           </>
         )}
-        <span className="tb-json__copy">
-          <CopyButton
-            text={path}
-            label={t('testbed.detail.path', { path })}
-            testId={TESTID.testbed.detail.copyPath(path)}
-          />
-        </span>
       </div>
       {branch && open && (
         <ul className="tb-json__children">

@@ -7,10 +7,10 @@
 | 컴포넌트          | 내용                                                                                                                                                    |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 상태 바           | 이름, 버전, 인스턴스, 코어별 상태 점, 열린 Run, 락 배너                                                                                                 |
-| 연결 패널         | 데이터면 주소(복사 버튼), 제어면 MCP URL, `.mcp.json` 조각, CLAUDE.md 스니펫 복사                                                                       |
+| 연결 패널         | 데이터면 주소(복사 버튼), 제어면 MCP URL, `.mcp.json` 조각, CLAUDE.md 스니펫 복사. 복사 버튼은 아이콘만(이름·툴팁 "… 복사", 누르면 체크 표시)           |
 | 코어 카드         | 상태, start/stop/reset, 설정 편집(JSON 편집기가 기본, 코어가 전용 폼으로 대체 가능), 액션 버튼, 결함 규칙 편집(§1.3). 외부 코어는 복제 표와 복제별 로그 |
 | 이벤트 로그       | 가상 스크롤(행 높이 고정, 보이는 행 + 위아래 20행). 필터·따라가기·생략 건수, 지난 Run은 REST(§1.5)                                                      |
-| 상세 패널         | 고른 이벤트의 봉투 + payload 트리(접기·펴기, 경로 복사), 가린 값 표시, 같은 correlationId 묶음(§1.5)                                                    |
+| 상세 패널         | 고른 이벤트의 봉투 + payload 트리(접기·펴기), 이벤트 JSON 복사, 가린 값 표시, 같은 correlationId 묶음(§1.5)                                             |
 | 통계 패널         | 현재 Run(없으면 스토어 전체)의 kind·level별 건수, 오류율, `latencyMs`의 평균·p95·최대, 초당 이벤트 수 스파크라인(§1.5)                                  |
 | Run 패널          | 열린 Run과 시작·종료, 지난 Run 목록, 요약, check 결과, 내보내기, 다른 주체가 닫은 Run·교체·재시작 표시(§1.5)                                            |
 | 에이전트 타임라인 | actor=`agent`인 이벤트와 `testbed.control.*`, `testbed.lease.*`만 시간순으로. 항목마다 caller 이름과 세션 앞 4자(§1.5)                                  |
@@ -78,7 +78,7 @@
   - 맨 아래(반 행 이내)에 있으면 새 이벤트를 따라갑니다. 위로 스크롤하면 멈추고 "새 이벤트 n건 · 맨 아래로" 버튼을 띄웁니다. 스크롤 이벤트가 닿기 전에 새 행이 오면, 마지막 자동 스크롤 위치보다 위에 있는지로 사람이 올라간 것을 알아챕니다.
   - 스토어의 `omitted` 누적(서버 표본화로 빠진 건수)을 로그 위에 표시합니다.
   - 열린 Run이 아닌 Run을 고르면 스토어 대신 `GET /events?runId=…`를 커서로 이어 받습니다(500건씩, 최대 20,000건).
-- **상세 패널**(`detail-panel.tsx`): 고른 이벤트를 `GET /events/:id`로 다시 읽습니다(링버퍼에서 밀려나 404면 목록의 이벤트를 그대로 씀). 봉투 필드(시각은 로컬과 UTC)와 payload 트리. 트리는 두 단계까지 펼쳐 두고, 값마다 경로(`payload.lease.holder`, `payload.items[0]`)를 복사할 수 있습니다. 공통 가림 형식(`앞4자…(len n, sha256:12자)`)의 값은 점선으로 강조하고 "가린 값" 배지를 붙입니다. `correlationId`가 있으면 같은 묶음의 이벤트를 REST(`GET /events?correlationId=…`, 같은 Run)로 가져와 보여 주고, 누르면 그 이벤트로 바뀝니다.
+- **상세 패널**(`detail-panel.tsx`): 고른 이벤트를 `GET /events/:id`로 다시 읽습니다(링버퍼에서 밀려나 404면 목록의 이벤트를 그대로 씀). 봉투 필드(시각은 로컬과 UTC)와 payload 트리. 트리는 두 단계까지 펼쳐 두고, 줄마다 경로(`data-path="payload.lease.holder"`, `payload.items[0]`)를 붙입니다. 제목 옆 버튼은 이벤트 전체를 JSON(들여쓰기 2칸)으로 복사합니다. 공통 가림 형식(`앞4자…(len n, sha256:12자)`)의 값은 점선으로 강조하고 "가린 값" 배지를 붙입니다. `correlationId`가 있으면 같은 묶음의 이벤트를 REST(`GET /events?correlationId=…`, 같은 Run)로 가져와 보여 주고, 누르면 그 이벤트로 바뀝니다.
 - **통계**(`stats-panel.tsx`): 대상은 열린 Run의 이벤트(없으면 스토어 전체). kind별·level별 건수, 오류율(`error` / 전체), `latencyMs`가 있는 kind의 건수·평균·p95(nearest-rank)·최대. 초당 이벤트 수(최근 60초) 스파크라인은 `<canvas>`에 `requestAnimationFrame`으로 직접 그리고, 초나 데이터가 바뀔 때만 다시 그립니다.
 - **Run**(`runs-panel.tsx`): 열린 Run(label, runId, 시작 시각, 연 주체, 경과 시간, seed)과 종료 버튼, 시작 폼(label, seed, "열린 Run을 닫고 시작"), 지난 Run 목록(`GET /runs`). 고르면 요약(기간, kind·level별 건수, 오류 상위, check 결과)과 내보내기 링크. `openedBy`와 `endedBy`가 다르면 "다른 주체가 닫음", `endReason`이 `replaced`·`restart`면 그 사유를 배지로 보여 줍니다.
 - **에이전트 타임라인**(`agent-timeline.tsx`): actor가 `agent`인 이벤트와 `testbed.control.*`, `testbed.lease.*`만 시간순(최근 500건). 항목마다 caller 이름과 세션(또는 lease id) 앞 4자를 붙입니다. caller는 `payload.caller`, 없으면 `payload.lease`(보유자)에서 읽습니다. 누르면 상세 패널에 보입니다.

@@ -1,7 +1,8 @@
 /**
  * The detail panel (docs/testbed/dashboard.md §1): the picked event in full
  * (`GET /events/:id`), its envelope fields and payload tree, and the other
- * events with the same `correlationId`, each a click away.
+ * events with the same `correlationId`, each a click away. One button copies
+ * the whole event as JSON.
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -11,6 +12,7 @@ import { ApiRequestError } from '../../api/http';
 import { testbedApi } from '../../api/endpoints';
 import { useI18n } from '../../i18n/locale-context';
 import { TESTID } from '../../testing/testids';
+import { CopyButton } from '../dashboard/copy-button';
 import { localTime } from './event-display';
 import { JsonViewer } from './json-viewer';
 import { useSelection } from './selection';
@@ -86,9 +88,18 @@ export function DetailPanel() {
       aria-labelledby="tb-detail-title"
       data-testid={TESTID.testbed.detail.root}
     >
-      <h2 id="tb-detail-title" className="tb-panel__title">
-        {t('testbed.detail.title')}
-      </h2>
+      <div className="tb-detail__head">
+        <h2 id="tb-detail-title" className="tb-panel__title">
+          {t('testbed.detail.title')}
+        </h2>
+        {event !== null && (
+          <CopyButton
+            text={JSON.stringify(event, null, 2)}
+            label={t('testbed.detail.eventJson')}
+            testId={TESTID.testbed.detail.copyEvent}
+          />
+        )}
+      </div>
       {event === null ? (
         <p className="muted">{t('testbed.detail.empty')}</p>
       ) : (

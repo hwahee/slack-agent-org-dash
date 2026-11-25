@@ -47,9 +47,7 @@ test('2. event flow: TCP data shows up in the log, and its payload in the detail
   const row = page.getByRole('listitem').filter({ hasText: 'sample.data.echoed' }).last();
   await row.click();
   const payload = page.getByTestId(TESTID.testbed.detail.payload);
-  const bytes = payload.locator('.tb-json__line', {
-    has: page.getByTestId(TESTID.testbed.detail.copyPath('payload.bytes')),
-  });
+  const bytes = payload.locator('.tb-json__line[data-path="payload.bytes"]');
   await expect(bytes).toContainText('5');
   await expect(payload).toContainText('"hello"');
 });

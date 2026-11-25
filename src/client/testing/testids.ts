@@ -53,7 +53,6 @@ export const TESTID = {
       copyEndpoint: (core: string, name: string) =>
         `testbed.connection.copy-endpoint.${core}.${name}`,
       mcpUrl: 'testbed.connection.mcp-url',
-      copyMcpUrl: 'testbed.connection.copy-mcp-url',
       copyMcpJson: 'testbed.connection.copy-mcp-json',
       copyClaudeMd: 'testbed.connection.copy-claude-md',
     },
@@ -127,7 +126,7 @@ export const TESTID = {
       groupItem: (eventId: string) => `testbed.detail.group-item.${eventId}`,
       /** A value in the masking format, marked "redacted". */
       redacted: 'testbed.detail.redacted',
-      copyPath: (path: string) => `testbed.detail.copy-path.${path}`,
+      copyEvent: 'testbed.detail.copy-event',
     },
     eventLog: {
       root: 'testbed.event-log',

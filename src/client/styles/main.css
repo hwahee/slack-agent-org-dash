@@ -350,7 +350,8 @@ a {
   overflow-wrap: anywhere;
 }
 
-.tb-connection__snippet-head {
+.tb-connection__snippet-head,
+.tb-detail__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -651,15 +652,6 @@ a {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1) var(--space-2);
-}
-
-.tb-json__copy {
-  opacity: 0.6;
-}
-
-.tb-json__line:hover .tb-json__copy,
-.tb-json__copy:focus-within {
-  opacity: 1;
 }
 
 .tb-json__toggle {
@@ -995,6 +987,13 @@ a {
 
 .btn--ghost:not(:disabled):hover {
   background: var(--color-surface-raised);
+}
+
+/* Icon-only copy button (testbed CopyButton): a square that fits beside what it copies. */
+.btn[data-copy-button] {
+  flex: none;
+  width: var(--control-height);
+  padding-inline: 0;
 }
 
 /* ── Form fields ──────────────────────────────────────────────────────────── */

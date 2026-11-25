@@ -79,7 +79,7 @@ idle → starting → running → stopping → stopped
 ```ts
 interface ActionDefinition<I extends CoreInstance> {
   title: string;
-  description: string; // 에이전트가 읽는 설명 — 부작용, 단위, 상한, 락 필요 여부를 적음
+  description: string; // 에이전트와 사람이 읽는 설명 — 부작용, 단위, 상한. 한국어 평문(대시보드에 그대로 보이므로 백틱 같은 마크다운 없이). 락 필요 여부는 적지 않음(MCP가 mutating으로 "(제어 락 필요)"·"(읽기 전용)"을 붙임)
   input: Validator<unknown>;
   output: Validator<unknown>;
   mutating: boolean; // true면 제어 락이 필요함

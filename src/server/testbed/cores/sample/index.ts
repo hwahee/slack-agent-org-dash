@@ -316,7 +316,7 @@ export const sampleCore: CoreDefinition<SampleConfig, SampleCore> = {
     broadcast: {
       title: 'Broadcast',
       description:
-        'Sends `text` (UTF-8, 1–4096 characters) to every open TCP connection, without faults. Returns how many connections it went to. Needs the control lease.',
+        '열린 TCP 연결 모두에 text(UTF-8, 1–4096자)를 보냄. 결함은 적용하지 않음. 보낸 연결 수(sent)를 돌려줌. 열린 연결이 없으면 0.',
       input: broadcastInput,
       output: broadcastOutput,
       mutating: true,

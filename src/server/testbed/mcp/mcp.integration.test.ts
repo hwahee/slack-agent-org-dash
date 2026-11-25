@@ -464,7 +464,8 @@ describe('events', () => {
     const echoed = all.find((event) => event.kind === 'sample.data.echoed');
     const full = await agent.call<TestbedEvent>('get_event', { id: echoed?.id });
     expect(full.payload).toMatchObject({ bytes: 5, preview: 'hello' });
-    await agent.fail('get_event', { id: 'nope:1' }, 'NOT_FOUND');
+    const noEvent = await agent.fail('get_event', { id: 'nope:1' }, 'NOT_FOUND');
+    expect(noEvent.message).toContain('query_events');
   });
 });
 
@@ -495,7 +496,9 @@ describe('actions and config', () => {
     expect(await agent.call('get_config', { core: 'sample' })).toMatchObject({
       maxConnections: 5,
     });
-    await agent.fail('get_config', { core: 'nope' }, 'NOT_FOUND');
+    const missing = await agent.fail('get_config', { core: 'nope' }, 'NOT_FOUND');
+    expect(missing.message).toBe("core 'nope' 없음. 있는 core: sample");
+    expect(missing.details).toMatchObject({ known: ['sample'] });
   });
 
   test('set_config with a key the config does not have is VALIDATION_ERROR, and nothing changes', async () => {

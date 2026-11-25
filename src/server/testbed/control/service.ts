@@ -337,6 +337,22 @@ export class ControlService {
     );
   }
 
+  /**
+   * For a NOT_FOUND message: the ids that do exist (`core` → core ids,
+   * `action` with `<core>.<name>` → that core's actions). `undefined` when
+   * there is no short list to give (events, Runs).
+   */
+  knownIds(resource: string, id: string): string[] | undefined {
+    const { host } = this.rt;
+    if (resource === 'core') return host.ids();
+    if (resource === 'action') {
+      const core = id.slice(0, id.lastIndexOf('.'));
+      if (!host.ids().includes(core)) return host.ids();
+      return host.describe(core).actions.map((action) => `${core}.${action.name}`);
+    }
+    return undefined;
+  }
+
   // ── Lease ────────────────────────────────────────────────────────────────
 
   acquireLease(caller: Caller) {

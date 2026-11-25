@@ -421,7 +421,16 @@ export function createTools(control: ControlService): () => Map<string, McpTool>
  * Expected failures become a tool result with `isError` and a sentence that
  * says what to do next; anything else is rethrown (JSON-RPC internal error).
  */
-export function errorResult(error: unknown): ToolResult {
+const NOT_FOUND_NEXT: Record<string, string> = {
+  event: 'query_events로 있는 이벤트 id를 확인',
+  run: 'testbed_info(열린 Run)나 REST GET /testbed/api/runs로 있는 Run id를 확인',
+};
+
+export function errorResult(
+  error: unknown,
+  /** The ids that do exist, for a NOT_FOUND message (`ControlService.knownIds`). */
+  knownIds?: (resource: string, id: string) => string[] | undefined,
+): ToolResult {
   let code: string;
   let message: string;
   let details: unknown;
@@ -433,8 +442,17 @@ export function errorResult(error: unknown): ToolResult {
     details = error.issues;
   } else if (error instanceof NotFoundError) {
     code = 'NOT_FOUND';
-    message = `${error.resource} '${error.id}' 없음. testbed_info(코어·Run)나 query_events(이벤트)로 있는 id를 확인`;
-    details = { resource: error.resource, id: error.id };
+    const known = knownIds?.(error.resource, error.id);
+    const next =
+      known === undefined
+        ? (NOT_FOUND_NEXT[error.resource] ?? 'testbed_info로 있는 id를 확인')
+        : `있는 ${error.resource}: ${known.length === 0 ? '(없음)' : known.join(', ')}`;
+    message = `${error.resource} '${error.id}' 없음. ${next}`;
+    details = {
+      resource: error.resource,
+      id: error.id,
+      ...(known === undefined ? {} : { known }),
+    };
   } else {
     throw error;
   }

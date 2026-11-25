@@ -170,7 +170,7 @@
 - **도구 주석**: 읽기 도구(`testbed_info`, `get_core_log`, `get_config`, `query_events`, `get_event`, `wait_for`, `check`, `export_run`, `mutating: false` 액션)는 `annotations.readOnlyHint: true`, 나머지는 `false`입니다.
 - **결과 형식**
   - 성공: `content`에 사람이 읽는 짧은 텍스트(여러 줄 가능), `structuredContent`에 기계용 객체.
-  - 실패: 제어 서비스가 던진 `TestbedError`, 검증 오류(`VALIDATION_ERROR`), 없는 대상(`NOT_FOUND`)은 JSON-RPC 오류가 아니라 도구 결과 `isError: true`입니다. `content`에는 오류 문장(다음 행동을 알려 주는 문장)을, `structuredContent`에는 `{ error: { code, message, details } }`를 담습니다. 예상하지 못한 예외만 JSON-RPC 내부 오류입니다. 없는 도구 이름은 JSON-RPC `InvalidParams`입니다.
+  - 실패: 제어 서비스가 던진 `TestbedError`, 검증 오류(`VALIDATION_ERROR`), 없는 대상(`NOT_FOUND`)은 JSON-RPC 오류가 아니라 도구 결과 `isError: true`입니다. `content`에는 오류 문장(다음 행동을 알려 주는 문장)을, `structuredContent`에는 `{ error: { code, message, details } }`를 담습니다. 예상하지 못한 예외만 JSON-RPC 내부 오류입니다. 없는 도구 이름은 JSON-RPC `InvalidParams`입니다. `NOT_FOUND` 문장은 코어·액션이면 실제로 있는 id를 나열하고(`core 'nope' 없음. 있는 core: sample`, `details.known`), 이벤트·Run이면 찾을 도구를 알려 줍니다.
   - 입력 검증은 SDK가 아니라 제어 서비스 쪽 검증기가 하므로 실패도 같은 형식(`VALIDATION_ERROR`)입니다. 그래서 SDK의 저수준 `Server`에 `tools/list`·`tools/call` 처리기를 직접 답니다.
 - **이벤트 한 줄 형식**(`query_events`, `wait_for`, `check`의 `content`): `<id> <HH:MM:SS.mmm> <level> <kind> <summary>`. 시각은 UTC입니다.
 - `testbed_info`의 `structuredContent.run`은 열린 Run의 메타에서 `configSnapshot`(모든 코어의 설정)을 뺀 것입니다. 설정 스냅숏은 `start_run`의 결과와 REST `GET /runs/current`에 있습니다.

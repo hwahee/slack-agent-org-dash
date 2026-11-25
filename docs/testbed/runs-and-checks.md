@@ -56,13 +56,13 @@ endRun() → RunSummary
 ## 2. check (판정)
 
 ```ts
-check({ filter: EventFilter, expect: { count?: '==n' | '>=n' | '<=n', none?: true }, label?: string })
+check({ filter: EventFilter, expect: { count?: '==n' | '>=n' | '<=n' | 'n' | n, none?: true }, label?: string })
   → { pass: boolean, matched: number, sample: EventLine[] }
 ```
 
 - `filter`는 `query_events`와 같은 필터입니다([control-plane.md](control-plane.md)). `runId`를 생략하면 열린 Run, 없으면 링버퍼 전체가 대상입니다.
-- `count`와 `none` 중 하나만 줍니다. 둘 다 없으면 `'>=1'`로 봅니다.
+- `count`와 `none` 중 하나만 줍니다. 둘 다 없으면 `'>=1'`로 봅니다. 연산자 없이 숫자만 주면(`'1'` 또는 `1`) `'==n'`입니다.
 - 결과로 pass/fail, 일치 건수, 일치한 이벤트 일부(최대 10건)를 payload 없는 한 줄(`EventLine`: `id`, `ts`, `level`, `kind`, `summary`, `correlationId?`)로 돌려줍니다.
 - 판정할 때마다 `testbed.check.evaluated` 이벤트가 남고, 열린 Run의 요약에 모입니다.
-- check는 조작이 아니므로 락이 필요 없습니다.
+- check는 조작이 아니므로 락이 필요 없습니다(MCP에서는 읽기 도구, `readOnlyHint: true`). 제품·코어 상태는 바꾸지 않지만 판정은 위 이벤트로 기록되므로, 도구 설명에는 "읽기 전용" 대신 기록이 남는다고 적습니다.
 - 시나리오 코어도 내부적으로 같은 판정 함수를 씁니다.

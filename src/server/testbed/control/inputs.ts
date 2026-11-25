@@ -6,6 +6,8 @@
 import { eventFilterSchema } from '@shared/testbed/events';
 import { s, toValidator } from '@shared/validation';
 
+import { countSchema } from '../runs/check';
+
 const label = s.string().check(s.minLength(1), s.maxLength(200));
 const coreId = s.string().check(s.minLength(1));
 
@@ -34,7 +36,7 @@ export const checkInput = toValidator(
     filter: s._default(eventFilterSchema, {}),
     expect: s._default(
       s.object({
-        count: s.optional(s.string().check(s.regex(/^(==|>=|<=)\d+$/))),
+        count: s.optional(countSchema),
         none: s.optional(s.literal(true)),
       }),
       {},

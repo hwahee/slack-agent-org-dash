@@ -26,6 +26,7 @@ import {
   waitInput,
 } from '../control/inputs';
 import type { ControlService } from '../control/service';
+import { expectedText } from '../runs/check';
 import {
   coreLogText,
   coreText,
@@ -285,7 +286,7 @@ function commonTools(control: ControlService): McpTool[] {
     }),
     tool({
       name: 'check',
-      description: `판정: \`filter\`에 맞는 이벤트 수가 \`expect\`(\`count\`: '==n' | '>=n' | '<=n', 또는 \`none: true\`; 생략하면 '>=1')를 만족하는지. 대상은 \`runId\`의 Run, 생략하면 열린 Run, 없으면 링버퍼 전체. 결과는 Run 요약에 남음.${READ_ONLY}`,
+      description: `판정: \`filter\`에 맞는 이벤트 수가 \`expect\`를 만족하는지. \`count\`는 '==n' | '>=n' | '<=n'(숫자만 주면 '==n'), 또는 \`none: true\`. 생략하면 '>=1'. 대상은 \`runId\`의 Run, 생략하면 열린 Run, 없으면 링버퍼 전체. 예: \`{ filter: { kind: 'sample.data.echoed' }, expect: { count: '==1' }, label: 'echo once' }\`, \`{ filter: { level: 'error' }, expect: { none: true } }\`. 제품·코어 상태는 바꾸지 않고 락도 필요 없음. 판정마다 testbed.check.evaluated 이벤트가 남고 열린 Run 요약에 모임.`,
       input: checkInput,
       readOnly: true,
       run: async (input, caller) => {
@@ -297,7 +298,7 @@ function commonTools(control: ControlService): McpTool[] {
           },
           caller,
         );
-        const expected = input.expect.none ? 'none' : (input.expect.count ?? '>=1');
+        const expected = expectedText(input.expect);
         const label = input.label === undefined ? '' : ` '${input.label}'`;
         return {
           text: `${out.pass ? 'PASS' : 'FAIL'}${label}: ${out.matched} matched (expected ${expected})\n${eventLinesText(out.sample)}`,

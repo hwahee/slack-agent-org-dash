@@ -232,6 +232,12 @@ describe('a test session', () => {
     });
     expect(checked.structuredContent).toMatchObject({ pass: true, matched: 1 });
     expect(checked.content[0]?.text).toStartWith('PASS: 1 matched (expected ==1)');
+    // A bare number means exactly that many.
+    const bare = await agent.raw('check', {
+      filter: { kind: 'sample.data.echoed' },
+      expect: { count: '1' },
+    });
+    expect(bare.content[0]?.text).toStartWith('PASS: 1 matched (expected ==1)');
 
     const ended = await agent.raw('end_run');
     expect(ended.structuredContent).toMatchObject({

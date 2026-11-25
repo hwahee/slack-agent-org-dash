@@ -87,7 +87,7 @@ export function useCanOperate(): boolean {
 export function useTestbedEvents(filter: EventFilter = {}): readonly TestbedEvent[] {
   const { events, status } = useTestbed();
   const openRun = status?.run?.runId ?? null;
-  const { runId, core, kind, level, actor, correlationId, text } = filter;
+  const { runId, core, kind, level, actor, correlationId, replica, text } = filter;
   return useMemo(() => {
     const wanted: EventFilter = {
       ...(core === undefined ? {} : { core }),
@@ -95,11 +95,12 @@ export function useTestbedEvents(filter: EventFilter = {}): readonly TestbedEven
       ...(level === undefined ? {} : { level }),
       ...(actor === undefined ? {} : { actor }),
       ...(correlationId === undefined ? {} : { correlationId }),
+      ...(replica === undefined ? {} : { replica }),
       ...(text === undefined ? {} : { text }),
     };
     const run = runId === 'current' ? openRun : runId;
     return events.filter(
       (event) => (runId === undefined || event.runId === run) && matchesFilter(event, wanted),
     );
-  }, [events, openRun, runId, core, kind, level, actor, correlationId, text]);
+  }, [events, openRun, runId, core, kind, level, actor, correlationId, replica, text]);
 }

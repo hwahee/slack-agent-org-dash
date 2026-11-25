@@ -94,6 +94,7 @@ class InitializeTest(unittest.TestCase):
             self.assertEqual(result["actions"]["echo"]["inputSchema"], SCHEMA)
             ctx = harness.adapter.ctx
             self.assertEqual((ctx.core_id, ctx.replica_id, ctx.replica_index, ctx.replicas), ("toy", "r1", 1, 2))
+            self.assertRegex(harness.stderr.getvalue(), r"^testbed_core: toy r1 initialized \(Python 3\.\d+\.\d+, protocol 1\)$")
 
         run(go())
 

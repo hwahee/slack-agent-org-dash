@@ -77,7 +77,12 @@ export interface ExternalCoreDeps {
    * restart count goes back to 0 (default 60 s).
    */
   timing?: { restartBackoffMs?: number; stableMs?: number };
+  /** A replica's counters or endpoints changed (the WS hub pushes the status). */
+  onStatusChanged?: () => void;
 }
+
+/** After an event, the replica's status is read again at most this often. */
+const EVENT_REFRESH_MS = 250;
 
 interface Replica {
   id: string;
@@ -106,6 +111,8 @@ interface Replica {
   restartTimer?: ReturnType<typeof setTimeout>;
   /** `performance.now()` when it last became `running`. */
   runningSince?: number;
+  /** A status read after an event is due. */
+  refreshTimer?: ReturnType<typeof setTimeout>;
 }
 
 function errorDetail(error: unknown): string {
@@ -719,8 +726,26 @@ export class ExternalCore {
     }
   }
 
+  /** Events move counters: read the replica's status soon (at most every 250 ms). */
+  private refreshSoon(replica: Replica): void {
+    if (replica.refreshTimer !== undefined) return;
+    replica.refreshTimer = setTimeout(() => {
+      replica.refreshTimer = undefined;
+      void this.refresh(replica);
+    }, EVENT_REFRESH_MS);
+    replica.refreshTimer.unref();
+  }
+
   private takeStatus(replica: Replica, answer: unknown): void {
     if (!isObject(answer)) return;
+    const before = JSON.stringify([replica.counters, replica.endpoints]);
+    this.readStatus(replica, answer);
+    if (JSON.stringify([replica.counters, replica.endpoints]) !== before) {
+      this.deps.onStatusChanged?.();
+    }
+  }
+
+  private readStatus(replica: Replica, answer: Record<string, unknown>): void {
     if (Array.isArray(answer.endpoints)) {
       replica.endpoints = answer.endpoints
         .filter(
@@ -749,6 +774,8 @@ export class ExternalCore {
 
   private async endProcess(replica: Replica): Promise<void> {
     clearInterval(replica.ping);
+    clearTimeout(replica.refreshTimer);
+    replica.refreshTimer = undefined;
     const rpc = replica.rpc;
     if (!rpc || rpc.exited) return;
     replica.ending = true;
@@ -938,6 +965,7 @@ export class ExternalCore {
       ...(typeof params.correlationId === 'string' ? { correlationId: params.correlationId } : {}),
       ...(typeof params.latencyMs === 'number' ? { latencyMs: params.latencyMs } : {}),
     });
+    this.refreshSoon(replica);
   }
 
   private setReplicaState(replica: Replica, to: CoreState, detail?: string): void {

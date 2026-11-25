@@ -49,6 +49,15 @@ export interface TestbedManifest {
   features: { runStore: 'memory' | 'file'; seed: boolean };
 }
 
+/** `getCoreLog` / `GET /cores/:core/log` (§2, §3): each replica's latest stderr lines, masked. */
+export interface CoreLog {
+  core: string;
+  external: boolean;
+  replicas: { replica: string; lines: string[] }[];
+  /** Why there is nothing to show (an in-proc core has no process). */
+  note?: string;
+}
+
 /** `/testbed/ws` messages (§5). */
 export type TestbedSocketMessage =
   | { type: 'snapshot'; status: TestbedStatus; events: TestbedEvent[] }

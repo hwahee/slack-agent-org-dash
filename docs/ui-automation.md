@@ -60,37 +60,41 @@
 
 공통 컴포넌트는 `TESTID.testbed.*`이고, 코어 고유 화면은 `TESTID.<core>.*`입니다([testbed/dashboard.md](testbed/dashboard.md)).
 
-| testid                                                                                         | 요소                                                                                            |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `testbed.dashboard`                                                                            | 대시보드 전체                                                                                   |
-| `testbed.status-bar`                                                                           | 상태 바                                                                                         |
-| `testbed.status-bar.core.<id>`                                                                 | 코어 상태 점. `aria-label`은 `<core>: <state>`, `data-state`는 상태                             |
-| `testbed.status-bar.run`                                                                       | 열린 Run 표시(없으면 "열린 Run 없음")                                                           |
-| `testbed.status-bar.connection`                                                                | 실시간 연결 상태. `data-connection`: `connecting` \| `open` \| `reconnecting` \| `unauthorized` |
-| `testbed.lease-banner`                                                                         | 락 배너(락이 있을 때만 존재)                                                                    |
-| `testbed.restart-notice` / `.dismiss`                                                          | "테스트베드가 재시작됨" 알림과 닫기                                                             |
-| `testbed.login-required`                                                                       | 로그인이 필요할 때 대시보드 대신 보이는 안내                                                    |
-| `testbed.connection`                                                                           | 연결 패널                                                                                       |
-| `testbed.connection.endpoint.<core>.<name>` / `testbed.connection.copy-endpoint.<core>.<name>` | 데이터면 주소와 복사                                                                            |
-| `testbed.connection.mcp-url` / `.copy-mcp-url`                                                 | 제어면 MCP URL과 복사                                                                           |
-| `testbed.connection.copy-mcp-json` / `.copy-claude-md`                                         | `.mcp.json` 조각, CLAUDE.md 스니펫 복사                                                         |
-| `testbed.tabs.tab.<id>` / `testbed.tabs.panel`                                                 | 주 영역 탭(`aria-selected`)과 내용                                                              |
-| `testbed.core-column` / `testbed.core-card.<id>`                                               | 코어 열과 코어 카드                                                                             |
-| `testbed.detail` / `.payload`                                                                  | 상세 패널과 payload 트리                                                                        |
-| `testbed.detail.group` / `testbed.detail.group-item.<eventId>`                                 | 같은 correlationId 묶음과 그 항목                                                               |
-| `testbed.detail.redacted`                                                                      | 가린 값(배지 "가린 값")                                                                         |
-| `testbed.detail.copy-path.<path>`                                                              | 값의 경로 복사(예: `payload.bytes`)                                                             |
-| `testbed.event-log` / `testbed.event-log.row.<eventId>`                                        | 이벤트 로그와 행(`aria-current`가 고른 행)                                                      |
-| `testbed.event-log.jump-latest`                                                                | "새 이벤트 n건 · 맨 아래로"(따라가기를 멈췄을 때만)                                             |
-| `testbed.event-log.filter.<field>`                                                             | 필터(`run`, `core`, `kind`, `level`, `actor`, `text`)                                           |
-| `testbed.event-log.count` / `.omitted`                                                         | 보이는 건수, 표본화로 생략된 건수                                                               |
-| `testbed.stats` / `.sparkline` / `.latency`                                                    | 통계 탭, 초당 이벤트 수 캔버스, 지연 표                                                         |
-| `testbed.runs.open` / `.start` / `.end`                                                        | 열린 Run, Run 시작·종료 버튼                                                                    |
-| `testbed.runs.label` / `.seed` / `.end-active`                                                 | 시작 폼 입력                                                                                    |
-| `testbed.runs.item.<runId>` / `.summary` / `.export`                                           | 지난 Run, 고른 Run의 요약과 내보내기 링크                                                       |
-| `testbed.agent-timeline` / `testbed.agent-timeline.item.<eventId>`                             | 에이전트 타임라인과 항목                                                                        |
-| `testbed.open-cores` / `testbed.open-detail`                                                   | 1024px 미만에서 코어 열·상세를 여는 버튼                                                        |
-| `testbed.cores-overlay` / `testbed.detail-overlay`                                             | 그때 열리는 사이드바·바텀시트(`.panel`, `.close` 파생)                                          |
+| testid                                                                                         | 요소                                                                                                                                            |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `testbed.dashboard`                                                                            | 대시보드 전체                                                                                                                                   |
+| `testbed.status-bar`                                                                           | 상태 바                                                                                                                                         |
+| `testbed.status-bar.core.<id>`                                                                 | 코어 상태 점. `aria-label`은 `<core>: <state>`, `data-state`는 상태                                                                             |
+| `testbed.status-bar.run`                                                                       | 열린 Run 표시(없으면 "열린 Run 없음")                                                                                                           |
+| `testbed.status-bar.connection`                                                                | 실시간 연결 상태. `data-connection`: `connecting` \| `open` \| `reconnecting` \| `unauthorized`                                                 |
+| `testbed.lease-banner`                                                                         | 락 배너(락이 있을 때만 존재)                                                                                                                    |
+| `testbed.restart-notice` / `.dismiss`                                                          | "테스트베드가 재시작됨" 알림과 닫기                                                                                                             |
+| `testbed.login-required`                                                                       | 로그인이 필요할 때 대시보드 대신 보이는 안내                                                                                                    |
+| `testbed.connection`                                                                           | 연결 패널                                                                                                                                       |
+| `testbed.connection.endpoint.<core>.<name>` / `testbed.connection.copy-endpoint.<core>.<name>` | 데이터면 주소와 복사                                                                                                                            |
+| `testbed.connection.mcp-url` / `.copy-mcp-url`                                                 | 제어면 MCP URL과 복사                                                                                                                           |
+| `testbed.connection.copy-mcp-json` / `.copy-claude-md`                                         | `.mcp.json` 조각, CLAUDE.md 스니펫 복사                                                                                                         |
+| `testbed.tabs.tab.<id>` / `testbed.tabs.panel`                                                 | 주 영역 탭(`aria-selected`)과 내용                                                                                                              |
+| `testbed.core-column` / `testbed.core-card.<id>`                                               | 코어 열과 코어 카드                                                                                                                             |
+| `testbed.core-card.replicas.<id>`                                                              | 외부 코어의 복제 표                                                                                                                             |
+| `testbed.core-card.replica.<id>.<replicaId>`                                                   | 복제 한 행(`data-state`, `data-restarts`). 행의 id 버튼(`aria-expanded`)이 로그를 엶                                                            |
+| `testbed.core-card.replica-log.<id>.<replicaId>`                                               | 그 복제의 stderr 최근 50줄(행을 펼쳤을 때만)                                                                                                    |
+| `testbed.action.target.<core>.<name>`                                                          | 외부 코어 액션의 대상 선택(`''` = 전체 복제, `r0`, `r1` …). 결과는 `testbed.action.result.<core>.<name>` 안에 복제마다 `[data-replica="r0"]` 칸 |
+| `testbed.detail` / `.payload`                                                                  | 상세 패널과 payload 트리                                                                                                                        |
+| `testbed.detail.group` / `testbed.detail.group-item.<eventId>`                                 | 같은 correlationId 묶음과 그 항목                                                                                                               |
+| `testbed.detail.redacted`                                                                      | 가린 값(배지 "가린 값")                                                                                                                         |
+| `testbed.detail.copy-path.<path>`                                                              | 값의 경로 복사(예: `payload.bytes`)                                                                                                             |
+| `testbed.event-log` / `testbed.event-log.row.<eventId>`                                        | 이벤트 로그와 행(`aria-current`가 고른 행)                                                                                                      |
+| `testbed.event-log.jump-latest`                                                                | "새 이벤트 n건 · 맨 아래로"(따라가기를 멈췄을 때만)                                                                                             |
+| `testbed.event-log.filter.<field>`                                                             | 필터(`run`, `core`, `kind`, `level`, `actor`, `replica`, `text`). `replica`는 외부 코어가 있을 때만                                             |
+| `testbed.event-log.count` / `.omitted`                                                         | 보이는 건수, 표본화로 생략된 건수                                                                                                               |
+| `testbed.stats` / `.sparkline` / `.latency`                                                    | 통계 탭, 초당 이벤트 수 캔버스, 지연 표                                                                                                         |
+| `testbed.runs.open` / `.start` / `.end`                                                        | 열린 Run, Run 시작·종료 버튼                                                                                                                    |
+| `testbed.runs.label` / `.seed` / `.end-active`                                                 | 시작 폼 입력                                                                                                                                    |
+| `testbed.runs.item.<runId>` / `.summary` / `.export`                                           | 지난 Run, 고른 Run의 요약과 내보내기 링크                                                                                                       |
+| `testbed.agent-timeline` / `testbed.agent-timeline.item.<eventId>`                             | 에이전트 타임라인과 항목                                                                                                                        |
+| `testbed.open-cores` / `testbed.open-detail`                                                   | 1024px 미만에서 코어 열·상세를 여는 버튼                                                                                                        |
+| `testbed.cores-overlay` / `testbed.detail-overlay`                                             | 그때 열리는 사이드바·바텀시트(`.panel`, `.close` 파생)                                                                                          |
 
 - 락 상태는 `<html data-lease="none|agent|ci">`와 조작 컨트롤의 `aria-disabled="true"`로 관찰합니다.
 - 실시간 값은 WS로 100ms 묶음으로 들어오므로 고정 시간 대신 요소·속성의 변화를 기다립니다.

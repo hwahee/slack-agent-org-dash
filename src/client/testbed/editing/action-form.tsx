@@ -3,7 +3,9 @@
  * pressing it opens a form built from the action's input schema
  * (./schema-form.ts), or a JSON editor for schemas the form does not cover.
  * The output JSON or the error sentence shows under the form. Read-only
- * actions (`mutating: false`) run even while the lease is held.
+ * actions (`mutating: false`) run even while the lease is held. An external
+ * core's form picks its target (every replica, or one); the output then
+ * shows replica by replica.
  */
 import { useState } from 'react';
 
@@ -29,11 +31,54 @@ type Action = TestbedManifest['cores'][number]['actions'][number];
 const NO_SERVER = {};
 const refetchNothing = () => Promise.resolve(NO_SERVER);
 
-function ActionForm({ core, action }: { core: string; action: Action }) {
+interface ReplicaSlot {
+  replica: string;
+  ok: boolean;
+  text: string;
+}
+
+/** Output to show, replica by replica: one target → that replica; every replica → its slots. */
+function byReplica(
+  output: unknown,
+  target: string,
+  replicas: readonly string[],
+): ReplicaSlot[] | null {
+  const one = (replica: string): ReplicaSlot[] => [
+    { replica, ok: true, text: JSON.stringify(output, null, 2) },
+  ];
+  if (replicas.length === 0) return null;
+  if (target !== '') return one(target);
+  if (replicas.length === 1) return one(replicas[0] ?? '');
+  if (typeof output !== 'object' || output === null) return null;
+  const slots = output as Record<string, unknown>;
+  return replicas
+    .filter((replica) => replica in slots)
+    .map((replica) => {
+      const slot = slots[replica];
+      // A replica that failed holds { error: { code, message } } (protocol §6).
+      const failed = typeof slot === 'object' && slot !== null && 'error' in slot;
+      return { replica, ok: !failed, text: JSON.stringify(slot, null, 2) };
+    });
+}
+
+function ActionForm({
+  core,
+  action,
+  replicas,
+}: {
+  core: string;
+  action: Action;
+  replicas: readonly string[];
+}) {
   const { t } = useI18n();
+  const [target, setTarget] = useState('');
   const spec = formSpec(action.inputSchema);
   const fields = spec.kind === 'fields' ? spec.fields : [];
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [result, setResult] = useState<{
+    ok: boolean;
+    text: string;
+    replicas?: ReplicaSlot[];
+  } | null>(null);
   const [running, setRunning] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const editor = useLockAwareEditor<FormValues | string, object>({
@@ -68,15 +113,22 @@ function ActionForm({ core, action }: { core: string; action: Action }) {
       input = read.input;
     }
     setRunning(true);
-    const outcome = await editor.save(() => testbedApi.invokeAction(core, action.name, input), {
-      keepDraft: true,
-    });
-    setRunning(false);
-    setResult(
-      outcome.ok
-        ? { ok: true, text: JSON.stringify(outcome.result, null, 2) }
-        : { ok: false, text: errorMessage(outcome.error) },
+    const picked = target === '' ? undefined : target;
+    const outcome = await editor.save(
+      () => testbedApi.invokeAction(core, action.name, input, picked),
+      { keepDraft: true },
     );
+    setRunning(false);
+    if (!outcome.ok) {
+      setResult({ ok: false, text: errorMessage(outcome.error) });
+      return;
+    }
+    const split = byReplica(outcome.result, target, replicas);
+    setResult({
+      ok: true,
+      text: JSON.stringify(outcome.result, null, 2),
+      ...(split === null ? {} : { replicas: split }),
+    });
   }
 
   const setField = (name: string, next: string | boolean) => {
@@ -86,6 +138,18 @@ function ActionForm({ core, action }: { core: string; action: Action }) {
   return (
     <LockAwareEditor editor={editor} draftText={asText}>
       <p className="muted tb-action__description">{action.description}</p>
+      {replicas.length > 0 && (
+        <Select
+          label={t('testbed.action.target')}
+          value={target}
+          options={[
+            { value: '', label: t('testbed.action.targetAll') },
+            ...replicas.map((replica) => ({ value: replica, label: replica })),
+          ]}
+          onChange={setTarget}
+          testId={TESTID.testbed.action.target(core, action.name)}
+        />
+      )}
       {typeof value === 'string' ? (
         <TextArea
           label={t('testbed.action.input')}
@@ -158,21 +222,45 @@ function ActionForm({ core, action }: { core: string; action: Action }) {
       >
         {t('testbed.action.run')}
       </OperateButton>
-      {result && (
-        <pre
-          className="tb-code"
-          data-ok={result.ok}
-          role={result.ok ? undefined : 'alert'}
-          data-testid={TESTID.testbed.action.result(core, action.name)}
-        >
-          {result.text}
-        </pre>
-      )}
+      {result &&
+        (result.replicas ? (
+          <div
+            className="tb-action__replicas"
+            data-testid={TESTID.testbed.action.result(core, action.name)}
+          >
+            {result.replicas.map((slot) => (
+              <section key={slot.replica} data-replica={slot.replica}>
+                <h4 className="tb-panel__subtitle">{slot.replica}</h4>
+                <pre className="tb-code" data-ok={slot.ok}>
+                  {slot.text}
+                </pre>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <pre
+            className="tb-code"
+            data-ok={result.ok}
+            role={result.ok ? undefined : 'alert'}
+            data-testid={TESTID.testbed.action.result(core, action.name)}
+          >
+            {result.text}
+          </pre>
+        ))}
     </LockAwareEditor>
   );
 }
 
-export function ActionList({ core, actions }: { core: string; actions: readonly Action[] }) {
+export function ActionList({
+  core,
+  actions,
+  replicas = [],
+}: {
+  core: string;
+  actions: readonly Action[];
+  /** An external core's replica ids (empty for in-proc cores). */
+  replicas?: readonly string[];
+}) {
   const [open, setOpen] = useState<string | null>(null);
   const shown = actions.filter((action) => action.surfaces.includes('ui'));
   if (shown.length === 0) return null;
@@ -194,7 +282,7 @@ export function ActionList({ core, actions }: { core: string; actions: readonly 
       {shown
         .filter((action) => action.name === open)
         .map((action) => (
-          <ActionForm key={action.name} core={core} action={action} />
+          <ActionForm key={action.name} core={core} action={action} replicas={replicas} />
         ))}
     </div>
   );

@@ -46,6 +46,9 @@ export const checkInput = toValidator(
 export const emptyInput = toValidator(s.object({}));
 export const coreInput = toValidator(s.object({ core: coreId }));
 export const optionalCoreInput = toValidator(s.object({ core: s.optional(coreId) }));
+export const coreLogInput = toValidator(
+  s.object({ core: coreId, replica: s.optional(s.string().check(s.minLength(1))) }),
+);
 export const setConfigInput = toValidator(
   s.object({ core: coreId, patch: s.record(s.string(), s.unknown()) }),
 );

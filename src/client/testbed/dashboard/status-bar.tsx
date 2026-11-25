@@ -47,7 +47,15 @@ export function StatusBar({
               className="tb-dot"
               data-state={core.state}
               role="img"
-              aria-label={t('testbed.status.core', { core: core.id, state: core.state })}
+              aria-label={
+                core.external && core.replicas
+                  ? t('testbed.status.coreReplicas', {
+                      core: core.id,
+                      state: core.state,
+                      n: core.replicas.length,
+                    })
+                  : t('testbed.status.core', { core: core.id, state: core.state })
+              }
               data-testid={TESTID.testbed.statusBar.core(core.id)}
             />
             <span aria-hidden>{core.id}</span>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import sys
@@ -15,7 +16,10 @@ from testbed_core import Adapter, Core  # noqa: E402
 class Harness:
     def __init__(self, core: Core, env: dict[str, str] | None = None) -> None:
         self.lines: list[dict[str, Any]] = []
-        self.adapter = Adapter(core, env=env or {}, write=lambda line: self.lines.append(json.loads(line)))
+        self.stderr = io.StringIO()
+        self.adapter = Adapter(
+            core, env=env or {}, write=lambda line: self.lines.append(json.loads(line)), stderr=self.stderr
+        )
         self.next_id = 1
 
     async def call(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:

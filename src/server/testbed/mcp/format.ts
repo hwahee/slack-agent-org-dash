@@ -2,6 +2,7 @@
  * The short texts MCP tools put in `content` (docs/testbed/control-plane.md §4):
  * people and agents read these; programs read `structuredContent`.
  */
+import type { CoreLog } from '@shared/testbed/control';
 import type { CoreStatus } from '@shared/testbed/core';
 import type { EventLine } from '@shared/testbed/events';
 import type { LeaseView } from '@shared/testbed/lease';
@@ -22,13 +23,38 @@ export function eventLinesText(lines: readonly EventLine[]): string {
   return lines.length === 0 ? '(no events)' : lines.map(eventLineText).join('\n');
 }
 
-/** `sample running tcp://127.0.0.1:40001 actions: broadcast` */
+/**
+ * `sample running tcp://127.0.0.1:40001 actions: broadcast`; an external core
+ * adds its replicas: `py-echo running x2 (r0 running pid 123, r1 running pid 124) …`.
+ */
 export function coreText(core: CoreStatus, actions: readonly string[]): string {
   const parts = [core.id, core.state];
   if (core.detail !== undefined) parts.push(`(${core.detail})`);
+  if (core.external && core.replicas) {
+    const each = core.replicas.map((replica) =>
+      [
+        replica.id,
+        replica.state,
+        ...(replica.pid === undefined ? [] : [`pid ${replica.pid}`]),
+      ].join(' '),
+    );
+    parts.push(`x${core.replicas.length}`, `(${each.join(', ')})`);
+  }
   parts.push(...core.endpoints.map((endpoint) => endpoint.url));
   if (actions.length > 0) parts.push(`actions: ${actions.join(', ')}`);
   return parts.join(' ');
+}
+
+/** Each replica's lines under a `r0 (3 lines)` header; an in-proc core's note. */
+export function coreLogText(log: CoreLog): string {
+  if (!log.external) return `${log.core}: ${log.note ?? ''}`;
+  return log.replicas
+    .map(({ replica, lines }) =>
+      [`${log.core} ${replica} (${lines.length} lines)`, ...lines.map((line) => `  ${line}`)].join(
+        '\n',
+      ),
+    )
+    .join('\n');
 }
 
 export function runText(run: RunMeta | null): string {

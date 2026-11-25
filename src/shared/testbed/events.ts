@@ -82,6 +82,8 @@ export interface EventFilter {
   level?: EventLevel;
   actor?: Actor;
   correlationId?: string;
+  /** An external core's replica (`r0`, `r1`, …). */
+  replica?: string;
   /** Substring of `summary`. */
   text?: string;
   /** Cursor `<instanceId>:<seq>`: only events after it. */
@@ -98,6 +100,7 @@ export const eventFilterSchema = s.object({
   level: s.optional(s.enum(EVENT_LEVELS)),
   actor: s.optional(s.enum(['product', 'human', 'agent', 'ci', 'system'])),
   correlationId: s.optional(s.string().check(s.minLength(1))),
+  replica: s.optional(s.string().check(s.minLength(1))),
   text: s.optional(s.string().check(s.minLength(1))),
   after: s.optional(s.string().check(s.minLength(1))),
   limit: s.optional(s.int().check(s.gte(1), s.lte(500))),
@@ -129,6 +132,7 @@ export function matchesFilter(event: TestbedEvent, filter: EventFilter): boolean
   if (filter.correlationId !== undefined && event.correlationId !== filter.correlationId) {
     return false;
   }
+  if (filter.replica !== undefined && event.replica !== filter.replica) return false;
   if (filter.text !== undefined && !event.summary.includes(filter.text)) return false;
   return true;
 }

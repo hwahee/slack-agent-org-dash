@@ -1,6 +1,7 @@
 /**
  * The event log tab (docs/testbed/dashboard.md §1): a virtual list with fixed
- * rows (time, level, actor, kind, summary), filters kept in the address,
+ * rows (time, level, actor, replica when any row has one, kind, summary),
+ * filters kept in the address,
  * following at the bottom, and the count the server's sampling left out.
  * A past Run is read over REST (`GET /events?runId=…`, page by page).
  */
@@ -62,6 +63,9 @@ function Filters({
   const runs = useRuns();
   const set = (patch: Partial<LogFilter>) => setFilter({ ...filter, ...patch });
   const any = { value: '' as const, label: t('testbed.log.any') };
+  const replicas = [
+    ...new Set((status?.cores ?? []).flatMap((core) => (core.replicas ?? []).map((r) => r.id))),
+  ].sort();
   return (
     <div className="tb-log__filters">
       <Select
@@ -118,6 +122,15 @@ function Filters({
         onChange={(actor) => set({ actor: actor === '' ? undefined : actor })}
         testId={TESTID.testbed.eventLog.filter('actor')}
       />
+      {(replicas.length > 0 || filter.replica !== undefined) && (
+        <Select
+          label={t('testbed.log.replica')}
+          value={filter.replica ?? ''}
+          options={[any, ...replicas.map((replica) => ({ value: replica, label: replica }))]}
+          onChange={(replica) => set({ replica: replica === '' ? undefined : replica })}
+          testId={TESTID.testbed.eventLog.filter('replica')}
+        />
+      )}
       <TextField
         label={t('testbed.log.search')}
         value={filter.text ?? ''}
@@ -147,6 +160,7 @@ export function EventLog() {
   });
   const source = past ? (pastEvents.data ?? []) : events;
   const rows = selectLogEvents(source, past ? { ...filter, run: 'all' } : filter, openRunId);
+  const withReplica = rows.some((event) => event.replica !== undefined);
 
   const viewport = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -187,7 +201,10 @@ export function EventLog() {
   const unseen = following ? 0 : Math.max(0, rows.length - seen);
 
   return (
-    <div className="tb-log" data-testid={TESTID.testbed.eventLog.root}>
+    <div
+      className={withReplica ? 'tb-log tb-log--replica' : 'tb-log'}
+      data-testid={TESTID.testbed.eventLog.root}
+    >
       <Filters
         filter={filter}
         setFilter={(next) =>
@@ -242,6 +259,7 @@ export function EventLog() {
               <span className="tb-log__time">{localTime(event.ts)}</span>
               <span className="tb-log__level">{event.level}</span>
               <span className="tb-log__actor">{event.actor}</span>
+              {withReplica && <span className="tb-log__replica">{event.replica ?? ''}</span>}
               <span className="tb-log__kind">{event.kind}</span>
               <span className="tb-log__summary">{event.summary}</span>
             </button>

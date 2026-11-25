@@ -65,6 +65,14 @@ export const TESTID = {
     coreCard: (id: string) => `testbed.core-card.${id}`,
     /** Folds the card to its header; `aria-expanded` says which. */
     coreCardToggle: (id: string) => `testbed.core-card.toggle.${id}`,
+    /** An external core's replica table. */
+    coreCardReplicas: (id: string) => `testbed.core-card.replicas.${id}`,
+    /** One replica's row: `data-state`, `data-restarts`; its button (`aria-expanded`) opens the log. */
+    coreCardReplica: (id: string, replicaId: string) =>
+      `testbed.core-card.replica.${id}.${replicaId}`,
+    /** The replica's latest stderr lines, under its row once opened. */
+    coreCardReplicaLog: (id: string, replicaId: string) =>
+      `testbed.core-card.replica-log.${id}.${replicaId}`,
     /** start / stop / reset; `aria-disabled="true"` while the lease is held. */
     coreOp: {
       start: (id: string) => `testbed.core-card.start.${id}`,
@@ -93,6 +101,8 @@ export const TESTID = {
       root: (core: string, name: string) => `testbed.action.${core}.${name}`,
       run: (core: string, name: string) => `testbed.action.run.${core}.${name}`,
       result: (core: string, name: string) => `testbed.action.result.${core}.${name}`,
+      /** External cores: which replica runs it (`''` = every replica). */
+      target: (core: string, name: string) => `testbed.action.target.${core}.${name}`,
       /** One input; `json` for the JSON editor fallback. */
       field: (core: string, name: string, field: string) =>
         `testbed.action.field.${core}.${name}.${field}`,

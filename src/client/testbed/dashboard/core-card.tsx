@@ -1,7 +1,7 @@
 /**
  * One card per core (docs/testbed/dashboard.md §1): title, kind, state and
- * counters; start / stop / reset; the config editor; action buttons; the
- * fault-rule editor. It folds away to its header.
+ * counters; an external core's replicas; start / stop / reset; the config
+ * editor; action buttons; the fault-rule editor. It folds away to its header.
  */
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
@@ -19,15 +19,8 @@ import { ConfigEditor } from '../editing/config-editor';
 import { errorMessage } from '../editing/errors';
 import { FaultEditor } from '../editing/fault-editor';
 import { OperateButton } from '../editing/operate-button';
-
-const STATE_TONE = {
-  running: 'success',
-  error: 'danger',
-  starting: 'warning',
-  stopping: 'warning',
-  idle: 'neutral',
-  stopped: 'neutral',
-} as const;
+import { ReplicaTable } from './replica-table';
+import { STATE_TONE } from './state-tone';
 
 const OPERATIONS = ['start', 'stop', 'reset'] as const;
 
@@ -72,6 +65,7 @@ export function CoreCard({ core, status }: { core: ManifestCore; status: CoreSta
       </header>
       <span className="muted tb-core-card__meta">
         {core.id} · {core.kind}
+        {core.external ? ` · ${t('testbed.core.external')}` : ''}
         {status?.detail === undefined ? '' : ` · ${status.detail}`}
       </span>
 
@@ -85,6 +79,10 @@ export function CoreCard({ core, status }: { core: ManifestCore; status: CoreSta
               </div>
             ))}
           </dl>
+
+          {core.external && status?.replicas && (
+            <ReplicaTable core={core.id} replicas={status.replicas} />
+          )}
 
           <div className="tb-core-card__ops">
             {OPERATIONS.map((op) => (
@@ -113,7 +111,13 @@ export function CoreCard({ core, status }: { core: ManifestCore; status: CoreSta
           {core.actions.some((action) => action.surfaces.includes('ui')) && (
             <section className="tb-core-card__section" aria-label={t('testbed.action.title')}>
               <h3 className="tb-panel__subtitle">{t('testbed.action.title')}</h3>
-              <ActionList core={core.id} actions={core.actions} />
+              <ActionList
+                core={core.id}
+                actions={core.actions}
+                replicas={
+                  core.external ? (status?.replicas ?? []).map((replica) => replica.id) : []
+                }
+              />
             </section>
           )}
 

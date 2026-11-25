@@ -194,8 +194,15 @@ def _with_common_fields(schema: JsonObject) -> JsonObject:
 class Adapter:
     """Reads requests, runs them against the core, writes answers and notifications."""
 
-    def __init__(self, core: Core, env: Optional[dict[str, str]] = None, write: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(
+        self,
+        core: Core,
+        env: Optional[dict[str, str]] = None,
+        write: Optional[Callable[[str], None]] = None,
+        stderr: Optional[Any] = None,
+    ) -> None:
         self.core = core
+        self._stderr = stderr
         self.env = dict(os.environ if env is None else env)
         self._write = write or self._stdout
         self.ctx = Context(env=self.env, _send=self.send)
@@ -235,6 +242,12 @@ class Adapter:
         ctx.replicas = int(params["replicas"])
         ctx.run_id = params.get("runId")
         self._reseed(params["seed"])
+        version = ".".join(str(part) for part in sys.version_info[:3])
+        print(
+            f"testbed_core: {ctx.core_id} {ctx.replica_id} initialized (Python {version}, protocol {PROTOCOL_VERSION})",
+            file=self._stderr or sys.stderr,
+            flush=True,
+        )
         core = self.core
         prefix = ctx.core_id.upper().replace("-", "_")
         auto_start = self.env.get(f"{prefix}_AUTO_START")

@@ -23,6 +23,7 @@ afterEach(async () => {
 
 const COMMON_TOOLS = [
   'testbed_info',
+  'get_core_log',
   'get_config',
   'set_config',
   'start',
@@ -40,6 +41,7 @@ const COMMON_TOOLS = [
 ];
 const READ_TOOLS = [
   'testbed_info',
+  'get_core_log',
   'get_config',
   'query_events',
   'get_event',
@@ -154,7 +156,7 @@ async function startTestbed(env: Record<string, string> = {}, idleTimeout?: numb
 }
 
 describe('initialize and tools/list', () => {
-  test('instructions as written; 15 common tools and sample_broadcast; readOnlyHint on reads only', async () => {
+  test('instructions as written; 16 common tools and sample_broadcast; readOnlyHint on reads only', async () => {
     const { connect } = await startTestbed();
     const { client } = await connect('m5-agent');
     expect(client.getInstructions()).toBe(MCP_INSTRUCTIONS);

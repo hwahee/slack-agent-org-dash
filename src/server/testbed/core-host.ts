@@ -10,6 +10,7 @@
  * in-proc ones behind the same methods; each is an `ExternalCore` that owns
  * its processes. The control service sees no difference.
  */
+import type { CoreLog } from '@shared/testbed/control';
 import type { CoreKind, CoreState, CoreStatus, FaultKind } from '@shared/testbed/core';
 import type { Caller } from '@shared/testbed/events';
 import type { FaultRule } from '@shared/testbed/faults';
@@ -24,6 +25,8 @@ import type { ExternalCoreDefinition } from './external/define';
 import { ExternalCore } from './external/external-core';
 import { FaultDecider } from './faults';
 import type { RunManager } from './runs/runs';
+
+const IN_PROC_LOG_NOTE = 'in-proc 코어는 프로세스 로그가 없음';
 
 const CORE_ID = /^[a-z][a-z0-9-]*$/;
 
@@ -155,6 +158,9 @@ export class CoreHost {
           log,
           env: this.env,
           cwd: this.options.cwd ?? process.cwd(),
+          onStatusChanged: () => {
+            for (const listener of this.statusListeners) listener();
+          },
           ...(this.options.externalTiming === undefined
             ? {}
             : { timing: this.options.externalTiming }),
@@ -393,8 +399,44 @@ export class CoreHost {
     return [...this.order];
   }
 
+  private readonly statusListeners = new Set<() => void>();
+
+  /**
+   * Called when an external core's counters or endpoints changed without an
+   * event of their own (they are read from the process). Returns the unsubscribe.
+   */
+  onStatusChanged(listener: () => void): () => void {
+    this.statusListeners.add(listener);
+    return () => this.statusListeners.delete(listener);
+  }
+
   statusAll(): CoreStatus[] {
     return this.order.map((id) => this.status(id));
+  }
+
+  /**
+   * Each replica's latest stderr lines (masked), or one replica's. An in-proc
+   * core has no process: an empty list and a note.
+   */
+  logs(id: string, replica?: string): CoreLog {
+    const external = this.externals.get(id);
+    if (!external) {
+      this.get(id);
+      return { core: id, external: false, replicas: [], note: IN_PROC_LOG_NOTE };
+    }
+    const all = external.logs();
+    if (replica === undefined) return { core: id, external: true, replicas: all };
+    const one = all.filter((entry) => entry.replica === replica);
+    if (one.length === 0) {
+      throw new ValidationError([
+        {
+          path: 'replica',
+          message: `no replica ${replica} (${all.map((entry) => entry.replica).join(', ')})`,
+          code: 'unknown_replica',
+        },
+      ]);
+    }
+    return { core: id, external: true, replicas: one };
   }
 
   /** Validates the input, runs the action, validates the output. */

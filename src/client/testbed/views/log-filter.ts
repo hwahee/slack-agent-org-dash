@@ -16,6 +16,8 @@ export interface LogFilter {
   /** This level or above. */
   level?: EventLevel;
   actor?: Actor;
+  /** An external core's replica (`r0`, `r1`, …). */
+  replica?: string;
   /** `current` (default: the open Run, else everything), `all`, or a Run id. */
   run: string;
   /** Substring of `summary`. */
@@ -31,6 +33,7 @@ const KEYS = {
   kind: 'kind',
   level: 'level',
   actor: 'actor',
+  replica: 'replica',
   run: 'run',
   text: 'q',
 } as const;
@@ -45,6 +48,7 @@ export function filterFromParams(params: URLSearchParams): LogFilter {
   const core = value(KEYS.core);
   const kind = value(KEYS.kind);
   const text = value(KEYS.text);
+  const replica = value(KEYS.replica);
   return {
     run: value(KEYS.run) ?? 'current',
     ...(core === undefined ? {} : { core }),
@@ -55,6 +59,7 @@ export function filterFromParams(params: URLSearchParams): LogFilter {
     ...(actor !== undefined && (ACTORS as readonly string[]).includes(actor)
       ? { actor: actor as Actor }
       : {}),
+    ...(replica === undefined ? {} : { replica }),
     ...(text === undefined ? {} : { text }),
   };
 }
@@ -93,6 +98,7 @@ export function selectLogEvents(
     ...(filter.kind === undefined ? {} : { kind: filter.kind }),
     ...(filter.level === undefined ? {} : { level: filter.level }),
     ...(filter.actor === undefined ? {} : { actor: filter.actor }),
+    ...(filter.replica === undefined ? {} : { replica: filter.replica }),
     ...(filter.text === undefined ? {} : { text: filter.text }),
   };
   return events.filter(

@@ -6,21 +6,22 @@
 
 ### 1.1 함수
 
-| 함수                            | 조작성(락 필요) | 내용                                                                                      |
-| ------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
-| `getManifest`                   | –               | 매니페스트(§6)                                                                            |
-| `getStatus`                     | –               | 코어 상태, 열린 Run, 락                                                                   |
-| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치                                                                |
-| `start` / `stop` / `reset`      | ●               | 코어 하나 또는 전체                                                                       |
-| `startRun` / `endRun`           | ●               | [runs-and-checks.md](runs-and-checks.md)                                                  |
-| `listRuns`                      | –               | Run 목록과 요약                                                                           |
-| `queryEvents` / `getEvent`      | –               | 이벤트 조회 / 하나의 전체 payload                                                         |
-| `waitFor`                       | –               | 조건에 맞는 이벤트 대기                                                                   |
-| `check`                         | –               | 판정                                                                                      |
-| `exportRun`                     | –               | JSONL 내보내기                                                                            |
-| `exportLocation`                | –               | 내보내기 URL·파일 경로(MCP `export_run`)                                                  |
-| `invokeAction`                  | 액션별          | 코어 액션([core-contract.md](core-contract.md)). 외부 코어는 `replica`로 복제 하나를 고름 |
-| `acquireLease` / `releaseLease` | –               | 제어 락                                                                                   |
+| 함수                            | 조작성(락 필요) | 내용                                                                                       |
+| ------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `getManifest`                   | –               | 매니페스트(§6)                                                                             |
+| `getStatus`                     | –               | 코어 상태, 열린 Run, 락                                                                    |
+| `getConfig` / `setConfig`       | set만           | 코어 설정 조회 / 부분 패치                                                                 |
+| `getCoreLog`                    | –               | 외부 코어의 복제별 stderr 최근 50줄(가림 적용). `replica`로 하나만. in-proc 코어는 빈 목록 |
+| `start` / `stop` / `reset`      | ●               | 코어 하나 또는 전체                                                                        |
+| `startRun` / `endRun`           | ●               | [runs-and-checks.md](runs-and-checks.md)                                                   |
+| `listRuns`                      | –               | Run 목록과 요약                                                                            |
+| `queryEvents` / `getEvent`      | –               | 이벤트 조회 / 하나의 전체 payload                                                          |
+| `waitFor`                       | –               | 조건에 맞는 이벤트 대기                                                                    |
+| `check`                         | –               | 판정                                                                                       |
+| `exportRun`                     | –               | JSONL 내보내기                                                                             |
+| `exportLocation`                | –               | 내보내기 URL·파일 경로(MCP `export_run`)                                                   |
+| `invokeAction`                  | 액션별          | 코어 액션([core-contract.md](core-contract.md)). 외부 코어는 `replica`로 복제 하나를 고름  |
+| `acquireLease` / `releaseLease` | –               | 제어 락                                                                                    |
 
 - 모든 함수는 `caller: { actor, sessionId?, leaseId?, name? }`를 받습니다. `sessionId`는 MCP 세션 id, `leaseId`는 REST로 잡은 락의 id, `name`은 표시 이름(예: MCP `clientInfo.name`)입니다.
 - 조작성 함수가 불리면 `testbed.control.invoked` 이벤트가 남습니다(함수 이름, 입력 요약, caller, 결과).
@@ -37,6 +38,7 @@
 | `level`         | 이 수준 이상                                               |
 | `actor`         | 행위 주체                                                  |
 | `correlationId` | 같은 묶음                                                  |
+| `replica`       | 외부 코어의 복제(`r0`, `r1`, …)                            |
 | `text`          | summary 부분 일치                                          |
 | `after`         | 커서 `<instanceId>:<seq>` 다음부터([events.md](events.md)) |
 | `limit`         | 기본 50, 상한 500                                          |
@@ -87,6 +89,7 @@
 | `PATCH /cores/:core/config`            | 부분 패치. 응답에 `applied` 또는 `restart-required`  |
 | `POST /cores/:core/{start,stop,reset}` | `:core`를 `_all`로 쓰면 전체                         |
 | `POST /cores/:core/actions/:name`      | 코어 액션. 외부 코어는 `?replica=r1`로 복제 하나에만 |
+| `GET /cores/:core/log?replica=`        | `getCoreLog`. `replica`를 빼면 모든 복제             |
 | `POST /runs`                           | Run 시작                                             |
 | `POST /runs/current/end`               | Run 종료                                             |
 | `GET /runs` · `GET /runs/:id`          | 목록과 요약                                          |
@@ -113,6 +116,7 @@
   - `GET /status` → `{ instanceId, cores: CoreStatus[], run: RunMeta | null, lease: LeaseView | null }`
   - `PATCH /cores/:core/config` → `{ result: 'applied' | 'restart-required', config }`
   - `POST /cores/:core/{start,stop,reset}` → `{ cores: CoreStatus[] }`
+  - `GET /cores/:core/log` → `{ core, external, replicas: [{ replica, lines }], note? }`. in-proc 코어는 `external: false`, `replicas: []`, `note: 'in-proc 코어는 프로세스 로그가 없음'`. 없는 복제는 400 `VALIDATION_ERROR`
   - `POST /runs` → 201 `RunMeta`. `GET /runs` → `{ runs }`. `GET /runs/current`는 열린 Run입니다.
   - `POST /runs/current/end` → 닫힌 `RunMeta`(요약 포함). 열린 Run이 없으면 404 `NOT_FOUND`
   - `GET /events` → `{ events, cursor, total }`. `cursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로), `total`은 커서 뒤에서 필터에 맞는 이벤트 수(`limit`을 넘는 것 포함)입니다. 닫힌 Run을 `runId`로 지정하면 Run 저장소에서 읽습니다.
@@ -138,35 +142,38 @@
 
 모든 도구는 제어 서비스 함수(§1)를 부르기만 합니다. 입력 검증기는 REST와 같은 것(`src/server/testbed/control/inputs.ts`)을 쓰고, 그 JSON Schema가 도구의 `inputSchema`입니다.
 
-| 도구                       | 입력                                                                                                   | `structuredContent`                                                                                          | 락     |
-| -------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------ |
-| `testbed_info`             | `{}`                                                                                                   | `{ name, version, instanceId, cores:[{id, kind, state, endpoints, actions:[name]}], run, lease }`            | –      |
-| `get_config`               | `{ core }`                                                                                             | 설정 객체                                                                                                    | –      |
-| `set_config`               | `{ core, patch }`                                                                                      | `{ result: 'applied' \| 'restart-required', config }`                                                        | ●      |
-| `start` / `stop` / `reset` | `{ core?: string }` (생략하면 `_all`)                                                                  | `{ cores: CoreStatus[] }`                                                                                    | ●      |
-| `start_run`                | `{ label, seed?, configOverrides?, endActive? }`                                                       | `RunMeta`                                                                                                    | ●      |
-| `end_run`                  | `{}`                                                                                                   | `RunMeta`(요약 포함)                                                                                         | ●      |
-| `query_events`             | 이벤트 필터 전체(`runId`, `core`, `kind`, `level`, `actor`, `correlationId`, `text`, `after`, `limit`) | `{ events: EventLine[], nextCursor, total }` — payload 없음                                                  | –      |
-| `get_event`                | `{ id }`                                                                                               | 이벤트 전체                                                                                                  | –      |
-| `wait_for`                 | `{ filter, count?: 1, timeoutMs?: 30000 }` (상한 120000)                                               | `{ matched, timedOut, events: EventLine[] }`                                                                 | –      |
-| `check`                    | `{ filter, expect, label? }`                                                                           | `{ pass, matched, sample: EventLine[] }`                                                                     | –      |
-| `export_run`               | `{ runId?: string }` (생략하면 열린 Run, 없으면 가장 최근에 닫힌 Run)                                  | `{ runId, url, path? }` — `url`은 `TESTBED_PUBLIC_URL` 기준 export 주소, `path`는 file 저장소일 때 파일 경로 | –      |
-| `acquire_control`          | `{}`                                                                                                   | `{ expiresAt }`                                                                                              | –      |
-| `release_control`          | `{}`                                                                                                   | `{ released }`                                                                                               | –      |
-| `<core>_<action>`          | 액션의 `input`                                                                                         | 액션의 출력(객체가 아니면 `{ result }`)                                                                      | 액션별 |
+| 도구                       | 입력                                                                                                              | `structuredContent`                                                                                                                                   | 락     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `testbed_info`             | `{}`                                                                                                              | `{ name, version, instanceId, cores:[{id, kind, state, endpoints, actions:[name], external?, replicas?:[{id, state, pid?, restarts}]}], run, lease }` | –      |
+| `get_core_log`             | `{ core, replica? }`                                                                                              | `getCoreLog`의 결과(§3 `GET /cores/:core/log`)                                                                                                        | –      |
+| `get_config`               | `{ core }`                                                                                                        | 설정 객체                                                                                                                                             | –      |
+| `set_config`               | `{ core, patch }`                                                                                                 | `{ result: 'applied' \| 'restart-required', config }`                                                                                                 | ●      |
+| `start` / `stop` / `reset` | `{ core?: string }` (생략하면 `_all`)                                                                             | `{ cores: CoreStatus[] }`                                                                                                                             | ●      |
+| `start_run`                | `{ label, seed?, configOverrides?, endActive? }`                                                                  | `RunMeta`                                                                                                                                             | ●      |
+| `end_run`                  | `{}`                                                                                                              | `RunMeta`(요약 포함)                                                                                                                                  | ●      |
+| `query_events`             | 이벤트 필터 전체(`runId`, `core`, `kind`, `level`, `actor`, `correlationId`, `replica`, `text`, `after`, `limit`) | `{ events: EventLine[], nextCursor, total }` — payload 없음                                                                                           | –      |
+| `get_event`                | `{ id }`                                                                                                          | 이벤트 전체                                                                                                                                           | –      |
+| `wait_for`                 | `{ filter, count?: 1, timeoutMs?: 30000 }` (상한 120000)                                                          | `{ matched, timedOut, events: EventLine[] }`                                                                                                          | –      |
+| `check`                    | `{ filter, expect, label? }`                                                                                      | `{ pass, matched, sample: EventLine[] }`                                                                                                              | –      |
+| `export_run`               | `{ runId?: string }` (생략하면 열린 Run, 없으면 가장 최근에 닫힌 Run)                                             | `{ runId, url, path? }` — `url`은 `TESTBED_PUBLIC_URL` 기준 export 주소, `path`는 file 저장소일 때 파일 경로                                          | –      |
+| `acquire_control`          | `{}`                                                                                                              | `{ expiresAt }`                                                                                                                                       | –      |
+| `release_control`          | `{}`                                                                                                              | `{ released }`                                                                                                                                        | –      |
+| `<core>_<action>`          | 액션의 `input`                                                                                                    | 액션의 출력(객체가 아니면 `{ result }`)                                                                                                               | 액션별 |
 
 - `EventLine`은 `{ id, ts, level, kind, summary, correlationId? }`입니다(`src/shared/testbed/events.ts`의 `toEventLine`).
 - `query_events`의 `total`은 커서 뒤에서 필터에 맞는 이벤트 수(`limit`을 넘는 것 포함)이고, `nextCursor`는 마지막으로 돌려준 이벤트의 id(없으면 `after` 그대로)입니다.
 - `wait_for`의 `timeoutMs`가 상한을 넘으면 검증 오류가 아니라 120000으로 잘립니다.
 - **외부 코어의 액션 도구**: 입력 스키마에 선택 속성 `replica`(문자열, 예: `"r1"`)가 덧붙습니다. 주면 그 복제에만, 없으면 모든 복제에 보냅니다. 결과는 복제가 1개면 출력 그대로, 2개 이상이면 `{ r0: 출력, r1: 출력, … }`이고, 실패한 복제의 자리에는 `{ error: { code, message } }`가 들어갑니다(전체는 성공). 없는 복제는 `VALIDATION_ERROR`입니다([external-core-protocol.md](external-core-protocol.md) §6). REST·제어 서비스도 같은 규칙입니다.
 - **액션 자동 노출**: `surfaces`에 `mcp`가 있는 액션마다 `<core>_<action>` 도구를 만듭니다. 코어 id의 `-`는 `_`로 바꿉니다. 설명은 액션의 `description`에 " (제어 락 필요)" 또는 " (읽기 전용)"을 덧붙이고, 입력 스키마는 액션 `input` 검증기의 JSON Schema입니다.
-- **도구 주석**: 읽기 도구(`testbed_info`, `get_config`, `query_events`, `get_event`, `wait_for`, `check`, `export_run`, `mutating: false` 액션)는 `annotations.readOnlyHint: true`, 나머지는 `false`입니다.
+- 공통 도구는 16개입니다(`<core>_<action>` 제외).
+- **도구 주석**: 읽기 도구(`testbed_info`, `get_core_log`, `get_config`, `query_events`, `get_event`, `wait_for`, `check`, `export_run`, `mutating: false` 액션)는 `annotations.readOnlyHint: true`, 나머지는 `false`입니다.
 - **결과 형식**
   - 성공: `content`에 사람이 읽는 짧은 텍스트(여러 줄 가능), `structuredContent`에 기계용 객체.
   - 실패: 제어 서비스가 던진 `TestbedError`, 검증 오류(`VALIDATION_ERROR`), 없는 대상(`NOT_FOUND`)은 JSON-RPC 오류가 아니라 도구 결과 `isError: true`입니다. `content`에는 오류 문장(다음 행동을 알려 주는 문장)을, `structuredContent`에는 `{ error: { code, message, details } }`를 담습니다. 예상하지 못한 예외만 JSON-RPC 내부 오류입니다. 없는 도구 이름은 JSON-RPC `InvalidParams`입니다.
   - 입력 검증은 SDK가 아니라 제어 서비스 쪽 검증기가 하므로 실패도 같은 형식(`VALIDATION_ERROR`)입니다. 그래서 SDK의 저수준 `Server`에 `tools/list`·`tools/call` 처리기를 직접 답니다.
 - **이벤트 한 줄 형식**(`query_events`, `wait_for`, `check`의 `content`): `<id> <HH:MM:SS.mmm> <level> <kind> <summary>`. 시각은 UTC입니다.
-- `testbed_info`의 `content`는 이름·버전·instanceId 한 줄, 코어마다 한 줄(`sample running tcp://127.0.0.1:40001 actions: broadcast`), 열린 Run 한 줄, 락 보유자 한 줄입니다.
+- `testbed_info`의 `content`는 이름·버전·instanceId 한 줄, 코어마다 한 줄(`sample running tcp://127.0.0.1:40001 actions: broadcast`), 열린 Run 한 줄, 락 보유자 한 줄입니다. 외부 코어 줄은 상태 뒤에 복제 수와 복제별 상태를 덧붙입니다(`py-echo running x2 (r0 running pid 123, r1 running pid 124) tcp://… actions: broadcast`).
+- `get_core_log`의 `content`는 복제마다 머리 줄(`py-echo r1 (12 lines)`)과 두 칸 들여 쓴 줄들, in-proc 코어는 `sample: in-proc 코어는 프로세스 로그가 없음`입니다.
 
 ### 4.2 도구 설계 규칙
 
@@ -184,7 +191,7 @@
 - 메시지(`TestbedSocketMessage`, `src/shared/testbed/control.ts`)
   - `{ type: 'snapshot', status, events }` — 연결 직후 한 번. `events`는 링버퍼의 최근 200건
   - `{ type: 'event', events, omitted }` — 100ms마다 묶어 보냄
-  - `{ type: 'status', status }` — 코어 상태 변화, Run 시작·종료 때. 코어 이벤트(데이터면 트래픽)가 있으면 카운터가 바뀌므로 최대 1초에 한 번 더 보냅니다
+  - `{ type: 'status', status }` — 코어 상태 변화, Run 시작·종료 때. 코어 이벤트(데이터면 트래픽)가 있으면 카운터가 바뀌므로 최대 1초에 한 번 더 보냅니다. 외부 코어의 카운터·엔드포인트는 프로세스에서 읽어 오므로, 그 코어의 이벤트가 오면 glue가 그 복제의 `status`를 곧(최대 250ms마다) 다시 읽고, 값이 바뀌었으면 같은 규칙으로 보냅니다
   - `{ type: 'lease', lease }` — 락 획득·해제·만료 때
   - `status`와 `lease`는 그 변화를 알린 이벤트가 나간 뒤, 같은 틱이 끝날 때 상태를 읽어 보냅니다. `testbed.run.ended`는 Run이 아직 열린 채로 발행되므로, 바로 읽으면 닫힌 Run이 열린 것으로 보이기 때문입니다. 한 틱에 둘 다 있으면 `status`(락 포함) 하나만 보냅니다.
 - 표본화: 1초 안에 200건을 넘으면 그 뒤로는 10건 중 1건만 보내고, 나머지 건수를 `omitted`에 담습니다. 링버퍼와 Run 저장소에는 모두 남습니다.

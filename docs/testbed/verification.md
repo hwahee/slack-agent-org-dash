@@ -54,7 +54,7 @@
 
 ### 4.2 순서
 
-1. **공통 점검**(`common`, 모든 테스트베드에서 같음): 공통 도구 15개를 모두 한 번 이상 부르고, 두 세션 사이의 락 배타성(`LEASE_HELD`), 락 보유 중 사람 REST 조작의 423, `release_control` 뒤 해제를 확인합니다. 코어를 stop → start → reset 하므로 포트 `0`으로 연 데이터면은 새 포트가 됩니다.
+1. **공통 점검**(`common`, 모든 테스트베드에서 같음): 공통 도구 16개를 모두 한 번 이상 부르고, 두 세션 사이의 락 배타성(`LEASE_HELD`), 락 보유 중 사람 REST 조작의 423, `release_control` 뒤 해제를 확인합니다. 코어를 stop → start → reset 하므로 포트 `0`으로 연 데이터면은 새 포트가 됩니다.
 2. **시나리오**: `src/server/testbed/cores/*/smoke/*.smoke.ts`와 예제 코어의 `examples/*/smoke/*.smoke.ts`를 시나리오 이름순으로 실행합니다. 예제 코어 시나리오는 `TESTBED_EXAMPLE_CORES`로 그 코어를 켜지 않으면 `requires`로 `SKIP`입니다. 시나리오마다 매니페스트를 새로 읽고(데이터면 주소가 바뀌었을 수 있음) 새 MCP 세션을 씁니다.
 3. **액션 커버리지**: 매니페스트에서 MCP에 노출된 액션(`<core>_<action>`)이 건너뛰지 않은 시나리오에서 한 번 이상 불렸는지(`t.call`·`t.callError`) 확인합니다. 안 불린 액션이 있으면 실패입니다.
 
@@ -123,6 +123,7 @@ total: 3 pass, 1 fail, 1 skip; coverage PASS
 - 제품과 에이전트 흉내는 브라우저 밖에서 합니다. 데이터면은 TCP(`tcp()`), 락과 설정은 REST(`api()`, `takeLease()`, actor `agent`)입니다.
 - 선택자는 ARIA 우선(`getByRole`, `getByLabel`), 그다음 `TESTID`([../ui-automation.md](../ui-automation.md))입니다. 화면 언어는 `en-US`로 고정합니다.
 - 페이지가 아직 모르는 변화를 만들어야 할 때(예: 저장 직전에 락이 걸림)는 `gateLiveUpdates(page)`로 `/testbed/ws` 메시지를 잠시 붙잡아 둡니다(`page.routeWebSocket`).
-- CI(`ci.yml`의 `ci` job): 스모크 뒤에 `bunx playwright install --with-deps chromium`과 `bun run test:ui`. 실패하면 `playwright-report/`와 `test-results/`(실패 화면 캡처)를 아티팩트로 올립니다.
+- 외부 코어 시험(9번, `e2e/external-core.e2e.ts`)은 Python 예제 코어가 필요합니다. `python3`(3.11 이상)이 있으면 `bun run test:ui`가 두 번째 인스턴스를 `TESTBED_EXAMPLE_CORES=py-echo PY_ECHO_REPLICAS=2`로 띄우고 주소를 `TESTBED_UI_PY_URL`로 넘깁니다. 없으면 9번은 건너뛰고(이유는 `TESTBED_UI_PYTHON_MISSING`), `TESTBED_REQUIRE_PYTHON=1`이면 실패합니다.
+- CI(`ci.yml`의 `ci` job): 스모크 뒤에 `bunx playwright install --with-deps chromium`과 `TESTBED_REQUIRE_PYTHON=1 bun run test:ui`. 실패하면 `playwright-report/`와 `test-results/`(실패 화면 캡처)를 아티팩트로 올립니다.
 
-testbed-base의 시험(`e2e/dashboard.e2e.ts`)은 `docs/spec.md` §11 M10의 수용 기준 1–8입니다. 테스트베드 레포는 고유 화면의 시험을 `e2e/` 아래에 더합니다.
+testbed-base의 시험은 `docs/spec.md` §11 M10의 수용 기준 1–8(`e2e/dashboard.e2e.ts`)과 M14의 9번(`e2e/external-core.e2e.ts`)입니다. 테스트베드 레포는 고유 화면의 시험을 `e2e/` 아래에 더합니다.

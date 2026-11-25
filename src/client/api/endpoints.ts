@@ -18,7 +18,7 @@
 import { appearanceParams, type Appearance } from '@shared/domain/appearance';
 import type { Sitemap } from '@shared/domain/sitemap';
 import type { User } from '@shared/domain/user';
-import type { TestbedManifest, TestbedStatus } from '@shared/testbed/control';
+import type { CoreLog, TestbedManifest, TestbedStatus } from '@shared/testbed/control';
 import type { CoreStatus } from '@shared/testbed/core';
 import type { EventFilter, EventLine, TestbedEvent } from '@shared/testbed/events';
 import type { RunMeta } from '@shared/testbed/runs';
@@ -137,14 +137,29 @@ export const testbedApi = {
   },
 
   /**
-   * `POST /testbed/api/cores/:core/actions/:name` — the action's output.
+   * `POST /testbed/api/cores/:core/actions/:name?replica=` — the action's output;
+   * an external core without `replica`: `{ r0: …, r1: … }` when it has several.
    * - Errors: 400 `VALIDATION_ERROR`, 409 `CORE_NOT_RUNNING`, 423 `LOCKED` (mutating actions).
    */
-  invokeAction(core: string, name: string, input: unknown): Promise<unknown> {
+  invokeAction(core: string, name: string, input: unknown, replica?: string): Promise<unknown> {
     return apiFetch(
       `/testbed/api/cores/${encodeURIComponent(core)}/actions/${encodeURIComponent(name)}`,
-      { method: 'POST', body: input ?? {} },
+      {
+        method: 'POST',
+        body: input ?? {},
+        ...(replica === undefined ? {} : { searchParams: { replica } }),
+      },
     );
+  },
+
+  /**
+   * `GET /testbed/api/cores/:core/log?replica=` — each replica's latest stderr
+   * lines (masked). An in-proc core: no replicas and a `note`.
+   */
+  coreLog(core: string, replica?: string): Promise<CoreLog> {
+    return apiFetch(`/testbed/api/cores/${encodeURIComponent(core)}/log`, {
+      ...(replica === undefined ? {} : { searchParams: { replica } }),
+    });
   },
 
   /**

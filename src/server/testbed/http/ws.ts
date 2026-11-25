@@ -36,6 +36,7 @@ export class TestbedSocketHub {
   private windowStart = 0;
   private inWindow = 0;
   private readonly unsubscribe: () => void;
+  private readonly unwatch: () => void;
   private readonly timer: ReturnType<typeof setInterval>;
 
   constructor(
@@ -43,6 +44,10 @@ export class TestbedSocketHub {
     private readonly bus: EventBus,
   ) {
     this.unsubscribe = bus.subscribe((event) => this.onEvent(event));
+    // External cores' counters are read from their processes, after the events.
+    this.unwatch = control.onStatusChanged(() => {
+      this.countersMoved = true;
+    });
     this.timer = setInterval(() => this.tick(), FLUSH_MS);
     this.timer.unref();
   }
@@ -64,6 +69,7 @@ export class TestbedSocketHub {
   dispose(): void {
     clearInterval(this.timer);
     this.unsubscribe();
+    this.unwatch();
   }
 
   /** Core events moved the counters since the last status. */

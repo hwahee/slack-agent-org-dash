@@ -1,6 +1,6 @@
 /**
  * The common check: the same on every testbed (docs/testbed/verification.md).
- * Calls each of the 15 common tools at least once, and checks the lease
+ * Calls each of the 16 common tools at least once, and checks the lease
  * across two sessions: `LEASE_HELD` for the other agent, 423 for a person,
  * free again after `release_control`.
  */
@@ -9,6 +9,7 @@ import { defineSmoke } from './index';
 export const COMMON_TOOLS = [
   'testbed_info',
   'get_config',
+  'get_core_log',
   'set_config',
   'start',
   'stop',
@@ -26,7 +27,7 @@ export const COMMON_TOOLS = [
 
 export const commonCheck = defineSmoke({
   name: 'common',
-  title: '공통 도구 15개와 제어 락 배타성',
+  title: '공통 도구 16개와 제어 락 배타성',
   spec: 'docs/spec.md §11 M6',
   async run(t) {
     const info = await t.call<{ cores: { id: string }[]; lease: unknown }>('testbed_info');
@@ -37,9 +38,12 @@ export const commonCheck = defineSmoke({
       t.ok(typeof config === 'object', 'get_config returns the config');
       const set = await t.call<{ result: string }>('set_config', { core, patch: {} });
       t.equal(set.result, 'applied', 'an empty patch applies');
+      const log = await t.call<{ core: string; replicas: unknown[] }>('get_core_log', { core });
+      t.ok(log.core === core && Array.isArray(log.replicas), 'get_core_log answers per replica');
     } else {
       // A testbed without cores still has to show these tools answer.
       await t.callError('get_config', { core: 'none' }, 'NOT_FOUND');
+      await t.callError('get_core_log', { core: 'none' }, 'NOT_FOUND');
       await t.callError('set_config', { core: 'none', patch: {} }, 'NOT_FOUND');
     }
 

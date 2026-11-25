@@ -107,6 +107,18 @@ export function testbedRestRoutes(control: ControlService, deps: HttpDeps, auth:
         return json({ cores: await control[op](req.params.core, caller) });
       },
     }),
+    '/testbed/api/cores/:core/log': route<'/testbed/api/cores/:core/log'>({
+      GET: (req, caller) =>
+        Promise.resolve(
+          json(
+            control.getCoreLog(
+              req.params.core,
+              caller,
+              new URL(req.url).searchParams.get('replica') ?? undefined,
+            ),
+          ),
+        ),
+    }),
     '/testbed/api/cores/:core/actions/:name': route<'/testbed/api/cores/:core/actions/:name'>({
       POST: async (req, caller) =>
         json(

@@ -7,7 +7,7 @@
  * extend it for its holder; operations need the lease (or no one holding it)
  * and leave a `testbed.control.invoked` event with their outcome.
  */
-import type { TestbedManifest, TestbedStatus } from '@shared/testbed/control';
+import type { CoreLog, TestbedManifest, TestbedStatus } from '@shared/testbed/control';
 import type { CoreStatus } from '@shared/testbed/core';
 import {
   matchesFilter,
@@ -115,6 +115,11 @@ export class ControlService {
     return this.status();
   }
 
+  /** External cores' counters or endpoints moved (WS pushes the status). */
+  onStatusChanged(listener: () => void): () => void {
+    return this.rt.host.onStatusChanged(listener);
+  }
+
   /** The status without touching the lease (WS pushes). */
   status(): TestbedStatus {
     return {
@@ -123,6 +128,12 @@ export class ControlService {
       run: this.rt.runs.active(),
       lease: this.lease.view(),
     };
+  }
+
+  /** Each replica's latest stderr lines (masked); `replica` picks one. */
+  getCoreLog(core: string, caller: Caller, replica?: string): CoreLog {
+    this.read(caller, 'getCoreLog');
+    return this.rt.host.logs(core, replica);
   }
 
   getConfig(core: string, caller: Caller): BaseCoreConfig {

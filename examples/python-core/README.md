@@ -80,7 +80,8 @@ if __name__ == "__main__":
 correlation_id)`, `rng`(`SeededRng`, 모든 무작위는 이것으로), `config`, `replica_id`·`replica_index`·`replicas`,
   `run_id`, `env`.
 - stdout은 프로토콜 전용입니다. `print`는 stderr로(`print(..., file=sys.stderr)`) 하거나 `ctx.log`를 씁니다.
-  stderr 마지막 줄들은 프로세스가 비정상 종료하면 `testbed.core.process.exited` 이벤트에 남습니다(비밀값은 가림).
+  어댑터는 `initialize` 때 stderr에 한 줄(`testbed_core: <core> <replica> initialized (Python …, protocol 1)`)을 씁니다.
+  stderr 최근 50줄은 `get_core_log`와 대시보드 복제 표에서 볼 수 있고, 마지막 줄들은 프로세스가 비정상 종료하면 `testbed.core.process.exited` 이벤트에 남습니다(비밀값은 가림).
 - 처리하지 못한 예외는 JSON-RPC 오류(`data.code: 'INTERNAL'`)가 되고 traceback은 stderr로 갑니다. 프로세스는
   끝나지 않습니다. 제어면 코드(`VALIDATION_ERROR`, `CORE_NOT_RUNNING` 등)로 `CoreError`를 던지면 그 코드와 HTTP
   상태가 그대로 쓰입니다.

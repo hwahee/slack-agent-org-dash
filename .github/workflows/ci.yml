@@ -66,8 +66,11 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
+      # Test 9 needs python3 (py-echo); TESTBED_REQUIRE_PYTHON=1 fails it instead of skipping.
       - name: UI tests
         run: bun run test:ui
+        env:
+          TESTBED_REQUIRE_PYTHON: '1'
 
       - name: Upload the Playwright report
         if: failure()

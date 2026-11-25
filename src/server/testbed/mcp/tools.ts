@@ -1,5 +1,5 @@
 /**
- * The MCP tools (docs/testbed/control-plane.md §4): the 15 common tools and
+ * The MCP tools (docs/testbed/control-plane.md §4): the 16 common tools and
  * one tool per core action exposed to MCP. Every tool only calls a control
  * service function and words its result; nothing is implemented here.
  */
@@ -16,6 +16,7 @@ import { TestbedError } from '../errors';
 import {
   checkInput,
   coreInput,
+  coreLogInput,
   emptyInput,
   eventIdInput,
   exportRunInput,
@@ -26,6 +27,7 @@ import {
 } from '../control/inputs';
 import type { ControlService } from '../control/service';
 import {
+  coreLogText,
   coreText,
   endedRunText,
   eventLinesText,
@@ -112,13 +114,27 @@ function commonTools(control: ControlService): McpTool[] {
       run: (_input, caller) => {
         const manifest = control.getManifest(caller);
         const status = control.getStatus(caller);
-        const cores = manifest.cores.map((core) => ({
-          id: core.id,
-          kind: core.kind,
-          state: core.state,
-          endpoints: core.endpoints,
-          actions: core.actions.map((action) => action.name),
-        }));
+        const cores = manifest.cores.map((core) => {
+          const replicas = status.cores.find((entry) => entry.id === core.id)?.replicas;
+          return {
+            id: core.id,
+            kind: core.kind,
+            state: core.state,
+            endpoints: core.endpoints,
+            actions: core.actions.map((action) => action.name),
+            ...(core.external
+              ? {
+                  external: true,
+                  replicas: (replicas ?? []).map(({ id, state, pid, restarts }) => ({
+                    id,
+                    state,
+                    ...(pid === undefined ? {} : { pid }),
+                    restarts,
+                  })),
+                }
+              : {}),
+          };
+        });
         const lines = [
           `${manifest.name} ${manifest.version} (instance ${manifest.instanceId})`,
           ...status.cores.map((core) =>
@@ -138,6 +154,16 @@ function commonTools(control: ControlService): McpTool[] {
             lease: status.lease,
           },
         });
+      },
+    }),
+    tool({
+      name: 'get_core_log',
+      description: `외부 코어 프로세스의 stderr 최근 50줄(비밀값은 가림), 복제마다. \`replica\`(예: "r1")를 주면 그 복제만. in-proc 코어는 빈 목록과 안내 문장.${READ_ONLY}`,
+      input: coreLogInput,
+      readOnly: true,
+      run: ({ core, replica }, caller) => {
+        const log = control.getCoreLog(core, caller, replica);
+        return Promise.resolve({ text: coreLogText(log), structured: { ...log } });
       },
     }),
     tool({

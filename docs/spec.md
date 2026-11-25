@@ -6,6 +6,7 @@
 
 | 날짜       | 바뀐 절                                                                                                                                                                                                                                                                    | 영향받는 마일스톤 |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 2026-11-25 | 3절·11절 M13: py-echo의 바인딩·공개 호스트 `PY_ECHO_BIND_HOST`·`PY_ECHO_PUBLIC_HOST` 추가. 11절 M6: 이미지 job의 포트를 포트 블록 전체(`-p 40000-40009:40000-40009`)로. 13절 1번(GHCR 공개 여부)을 공개로 결정해 3절로 옮김                                                | M6, M13           |
 | 2026-11-25 | 2절: M11 결과(JSON Schema → 검증기는 zod `fromJSONSchema`, 라이브러리 추가 없음)                                                                                                                                                                                           | M11               |
 | 2026-11-25 | 11절: P4(M11–M14 외부 프로세스 코어, 감시·복제, Python 참조 구현, 표면 반영) 추가. 3절(예제 코어), 12절 갱신. `testbed/external-core-protocol.md` 개정(initialize에서 설정 분리, 설정 필드, 오류 변환, 감시 이벤트, 언어 간 재현성), `testbed/ports.md`에 40002–40008 등록 | M11–M14           |
 | 2026-11-24 | 11절: P2(M5–M6 MCP 어댑터, 스모크)와 P3(M7–M10 대시보드, UI 자동화) 추가. 10절, 12절, 13절 갱신(13절 1번은 M1 성공으로 삭제)                                                                                                                                               | M5–M10            |
@@ -49,6 +50,7 @@
 
 - `py-echo`는 외부 코어 참조 구현의 예제입니다. 외부 프로세스를 쓰는 이유는 "다른 언어 SDK"의 자리 표시(Python 어댑터 시연)입니다. `TESTBED_EXAMPLE_CORES=py-echo`일 때만 등록됩니다.
 - 포트 블록: `40000–40009`([testbed/ports.md](testbed/ports.md)에 등록됨). `PORT` 기본값은 `40000`.
+- 이미지: `ghcr.io/hwahee/testbed-base`는 **공개 패키지**입니다(저장소와 같음). pull에 토큰이 필요 없습니다.
 
 ## 4. 상호작용 프로토콜 (샘플 코어)
 
@@ -378,7 +380,7 @@ P3(M7–M10)에서 만듭니다. 영역, 패널 슬롯, 편집 잠김 래퍼, te
   - `sample-run-replace`: `start_run` 두 번째 `RUN_ACTIVE` → `endActive: true`로 성공 → 앞 Run의 `endReason == 'replaced'`(REST `GET /runs/:id`).
 - **CI**
   - `ci.yml`의 테스트 단계 뒤에 `bun run testbed:smoke`를 추가합니다.
-  - 이미지 job: 이미지를 빌드한 뒤 push 전에 컨테이너를 띄우고(`-p 40000:40000`) `bun run testbed:smoke --url http://localhost:40000`이 통과해야 push합니다.
+  - 이미지 job: 이미지를 빌드한 뒤 push 전에 컨테이너를 띄우고(포트 블록 전체 `-p 40000-40009:40000-40009`. 스모크가 데이터면 포트에도 붙으므로) `bun run testbed:smoke --url http://localhost:40000`이 통과해야 push합니다.
 - `knip.json`의 `entry`에 `src/server/testbed/cores/*/smoke/*.smoke.ts`를 추가합니다(동적으로 불러오므로).
 
 **같은 PR에서 고칠 문서**
@@ -645,6 +647,7 @@ P3(M7–M10)에서 만듭니다. 영역, 패널 슬롯, 편집 잠김 래퍼, te
 - **py-echo** `examples/python-core/echo_core.py`와 선언 `examples/python-core/index.ts`(`defineExternalCore`):
   - `passive`. 샘플 코어의 TCP echo와 같은 동작을 줄인 것입니다: 받은 조각을 그대로 돌려보냄, `maxChunkBytes` 초과 시 닫음, 결함 `delay`·`disconnect`·`corrupt`(XOR `0xFF`), 액션 `broadcast {text}` → `{ sent }`.
   - 포트: `port`(env `PY_ECHO_PORT`, 기본 `40002`) + `replicaIndex`. `port`가 `0`이면 모든 복제가 임의 포트. 엔드포인트 이름은 `echo`.
+  - 호스트: 외부 코어에는 `TESTBED_BIND_HOST`가 전달되지 않으므로(protocol §2) 바인딩 주소는 `PY_ECHO_BIND_HOST`(기본 `127.0.0.1`, 컨테이너에서는 `0.0.0.0`), 엔드포인트 주소의 호스트는 `PY_ECHO_PUBLIC_HOST`(기본 `localhost`)로 받습니다.
   - 이벤트: `py-echo.connection.opened`, `py-echo.data.echoed`(`latencyMs` 포함), `py-echo.connection.closed`, `py-echo.broadcast.sent`. summary 형식은 샘플 코어(6절)와 같습니다.
   - 설정: `port`(0–65535), `maxChunkBytes`(1–1048576, 기본 65536), 공통 필드. `port` 변경은 `restart-required`.
 - **켜는 방법**: 공통 환경 변수 `TESTBED_EXAMPLE_CORES`(쉼표 목록, 기본 빈 값)에 `py-echo`를 넣으면 코어 호스트가 등록합니다. 예제 코어 목록은 공통 런타임이 `examples/`에서 모읍니다. 기본 이미지와 기본 실행에는 들어가지 않습니다.
@@ -715,4 +718,4 @@ P3(M7–M10)에서 만듭니다. 영역, 패널 슬롯, 편집 잠김 래퍼, te
 
 ## 13. 사람에게 확인할 결정
 
-1. **GHCR 이미지 공개 여부** — 저장소는 공개입니다. 이미지 패키지도 공개로 둘지, 비공개로 두고 pull에 토큰을 쓰게 할지.
+지금은 없습니다. (GHCR 이미지 공개 여부는 공개로 결정되어 3절에 있습니다.)

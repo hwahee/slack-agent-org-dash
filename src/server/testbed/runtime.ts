@@ -10,8 +10,7 @@ import type { Logger } from '../lib/log';
 import type { TestbedConfig } from './config';
 import { LeaseManager } from './control/lease';
 import { ControlService } from './control/service';
-import type { CoreDefinition } from './core';
-import { CoreHost } from './core-host';
+import { CoreHost, type AnyCoreDefinition } from './core-host';
 import { EventBus } from './events/bus';
 import type { TestbedHttp } from './http/routes';
 import { TestbedSocketHub } from './http/ws';
@@ -33,9 +32,11 @@ export async function createTestbedRuntime(options: {
   config: TestbedConfig;
   env: Record<string, string | undefined>;
   log: Logger;
-  cores: readonly CoreDefinition[];
+  cores: readonly AnyCoreDefinition[];
+  /** External cores' working directory (the repository root). */
+  cwd?: string;
 }): Promise<TestbedRuntime> {
-  const { config, env, log, cores } = options;
+  const { config, env, log, cores, cwd } = options;
   const bus = new EventBus({
     bufferSize: config.eventBuffer,
     maxPayloadBytes: config.maxPayloadBytes,
@@ -52,6 +53,7 @@ export async function createTestbedRuntime(options: {
     env,
     bindHost: config.bindHost,
     publicHost: new URL(config.publicUrl).hostname,
+    ...(cwd === undefined ? {} : { cwd }),
   });
   for (const core of cores) host.register(core);
   return { bus, store, runs, host };

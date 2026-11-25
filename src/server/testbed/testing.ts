@@ -7,10 +7,11 @@ import type { TestbedEvent } from '@shared/testbed/events';
 import { buildApp } from '../app';
 import { loadServerConfig, type ServerConfig } from '../config';
 import { createContainer } from '../container';
-import { silentLogger } from '../lib/log';
+import { silentLogger, type Logger } from '../lib/log';
 import { loadTestbedConfig } from './config';
-import type { CoreDefinition } from './core';
 import type { EventBus } from './events/bus';
+import type { AnyCoreDefinition } from './core-host';
+import { REPO_ROOT } from './smoke/load';
 import { createControlPlane, createTestbedRuntime } from './runtime';
 
 /**
@@ -19,9 +20,11 @@ import { createControlPlane, createTestbedRuntime } from './runtime';
  */
 export async function createTestControlPlane(
   options: {
-    cores?: readonly CoreDefinition[];
+    cores?: readonly AnyCoreDefinition[];
     env?: Record<string, string>;
     server?: Pick<ServerConfig, 'authDriver' | 'oidc'>;
+    /** Default: silent. */
+    log?: Logger;
   } = {},
 ) {
   const env = { SAMPLE_PORT: '0', ...options.env };
@@ -29,8 +32,9 @@ export async function createTestControlPlane(
   const runtime = await createTestbedRuntime({
     config,
     env,
-    log: silentLogger,
+    log: options.log ?? silentLogger,
     cores: options.cores ?? [],
+    cwd: REPO_ROOT,
   });
   const plane = createControlPlane(runtime, {
     config,
@@ -45,10 +49,11 @@ export async function createTestControlPlane(
  */
 export async function startTestServer(
   options: {
-    cores?: readonly CoreDefinition[];
+    cores?: readonly AnyCoreDefinition[];
     env?: Record<string, string>;
     /** `Bun.serve`'s idle timeout in seconds (default 10). */
     idleTimeout?: number;
+    log?: Logger;
   } = {},
 ) {
   const { runtime, plane } = await createTestControlPlane(options);
@@ -63,6 +68,7 @@ export async function startTestServer(
   async function stop() {
     await plane.dispose();
     await runtime.host.stopAll();
+    await runtime.host.shutdown();
     await server.stop(true);
     await container.dispose();
   }

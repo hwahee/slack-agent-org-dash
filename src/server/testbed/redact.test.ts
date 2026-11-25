@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 
 import { EventBus } from './events/bus';
-import { maskSecret, redact } from './redact';
+import { maskSecret, redact, redactText } from './redact';
 import { openFileRunStore } from './runs/file-store';
 import { RunManager } from './runs/runs';
 
@@ -85,5 +85,18 @@ describe('secrets never reach storage', () => {
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('redactText', () => {
+  test('masks secret values in a line of text, keeping the key', () => {
+    expect(redactText('sending Authorization: Bearer sk-abcdef123456 to upstream')).toBe(
+      `sending Authorization: ${maskSecret('Bearer sk-abcdef123456 to upstream')}`,
+    );
+    expect(redactText('api_token=abc123, user=kim')).toBe(
+      `api_token=${maskSecret('abc123')}, user=kim`,
+    );
+    expect(redactText('x-api-key: k1; ok')).toBe(`x-api-key: ${maskSecret('k1')}; ok`);
+    expect(redactText('nothing secret here: 42')).toBe('nothing secret here: 42');
   });
 });

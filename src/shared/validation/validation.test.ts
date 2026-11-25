@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { s, toValidator, ValidationError } from './index';
+import { fromJsonSchema, s, toJsonSchema, toValidator, ValidationError } from './index';
 
 const validator = toValidator(
   s.strictObject({
@@ -45,5 +45,52 @@ describe('validation facade', () => {
     const result = nested.safeParse({ user: { email: 7 } });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.issues[0]?.path).toBe('user.email');
+  });
+});
+
+describe('fromJsonSchema', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      port: { type: 'integer', minimum: 0, maximum: 65535 },
+      level: { type: 'string', enum: ['debug', 'info'] },
+      delay: {
+        anyOf: [
+          { type: 'integer', minimum: 0 },
+          {
+            type: 'object',
+            properties: { min: { type: 'integer' }, max: { type: 'integer' } },
+            required: ['min', 'max'],
+          },
+        ],
+      },
+    },
+    required: ['port', 'level'],
+    additionalProperties: false,
+  };
+
+  test('validates what the JSON Schema says, and hands the same schema back', () => {
+    const validator = fromJsonSchema(schema);
+    expect(validator.parse({ port: 1, level: 'info', delay: { min: 1, max: 2 } })).toEqual({
+      port: 1,
+      level: 'info',
+      delay: { min: 1, max: 2 },
+    });
+    const result = validator.safeParse({ port: 70_000, level: 'x', extra: 1 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.map((issue) => issue.path).sort()).toEqual(['', 'level', 'port']);
+    }
+    expect(validator.safeParse({ port: 1.5, level: 'info' }).ok).toBe(false);
+    expect(toJsonSchema(validator)).toEqual(schema);
+  });
+
+  test('something that is not a JSON Schema is refused with the reason', () => {
+    expect(() => fromJsonSchema('str')).toThrow('invalid JSON Schema');
+    expect(() => fromJsonSchema({ type: 'nope' })).toThrow('invalid JSON Schema');
+    expect(() => fromJsonSchema({ type: 'object', properties: 5 })).toThrow(
+      'invalid JSON Schema: (root).properties: not an object',
+    );
+    expect(() => fromJsonSchema({ hello: 'world' })).toThrow('no JSON Schema keyword');
   });
 });

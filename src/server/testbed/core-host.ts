@@ -5,17 +5,23 @@
  * state machine and announces every change as `testbed.core.state`, wires
  * each core's context (emit, rng, faults, signal) and runs actions. Leases
  * and `testbed.control.invoked` are the control service's job, on top.
+ *
+ * External cores (docs/testbed/external-core-protocol.md) sit next to the
+ * in-proc ones behind the same methods; each is an `ExternalCore` that owns
+ * its processes. The control service sees no difference.
  */
-import type { CoreState, CoreStatus, FaultKind } from '@shared/testbed/core';
+import type { CoreKind, CoreState, CoreStatus, FaultKind } from '@shared/testbed/core';
 import type { Caller } from '@shared/testbed/events';
 import type { FaultRule } from '@shared/testbed/faults';
-import { ValidationError, type ValidationIssue } from '@shared/validation';
+import { toJsonSchema, ValidationError, type ValidationIssue } from '@shared/validation';
 
 import type { Logger } from '../lib/log';
 import { NotFoundError } from '../lib/errors';
 import type { BaseCoreConfig, CoreContext, CoreDefinition, CoreInstance } from './core';
 import { TestbedError } from './errors';
 import type { EventBus } from './events/bus';
+import type { ExternalCoreDefinition } from './external/define';
+import { ExternalCore } from './external/external-core';
 import { FaultDecider } from './faults';
 import type { RunManager } from './runs/runs';
 
@@ -29,6 +35,33 @@ export interface CoreHostOptions {
   env?: Record<string, string | undefined>;
   bindHost?: string;
   publicHost?: string;
+  /** External cores' working directory (the repository root). Default: this process's. */
+  cwd?: string;
+}
+
+/** An in-proc core or an external one, as listed in `cores/index.ts`. */
+export type AnyCoreDefinition = CoreDefinition | ExternalCoreDefinition;
+
+/** What the manifest says about a core (docs/testbed/control-plane.md §6). */
+export interface CoreDescription {
+  id: string;
+  kind: CoreKind;
+  title: string;
+  external: boolean;
+  configSchema: Record<string, unknown>;
+  actions: {
+    name: string;
+    title: string;
+    description: string;
+    mutating: boolean;
+    surfaces: ('rest' | 'mcp' | 'ui')[];
+    inputSchema: Record<string, unknown>;
+  }[];
+  faults: readonly FaultKind[];
+}
+
+function isExternal(definition: AnyCoreDefinition): definition is ExternalCoreDefinition {
+  return 'external' in definition;
 }
 
 interface HostedCore {
@@ -84,6 +117,10 @@ function errorDetail(error: unknown): string {
 
 export class CoreHost {
   private readonly cores = new Map<string, HostedCore>();
+  private readonly externals = new Map<string, ExternalCore>();
+  /** Every core id in registration order. */
+  private readonly order: string[] = [];
+  private unsubscribe: (() => void) | undefined;
   private readonly env: Record<string, string | undefined>;
   private readonly bindHost: string;
   private readonly publicHost: string;
@@ -94,13 +131,32 @@ export class CoreHost {
     this.publicHost = options.publicHost ?? 'localhost';
   }
 
-  /** Validates the definition and its env defaults; the core starts `idle`. */
-  register(definition: CoreDefinition): void {
+  /**
+   * Validates the definition and its env defaults; the core starts `idle`.
+   * An external core's process is started by `startAutoStart` (boot).
+   */
+  register(definition: AnyCoreDefinition): void {
     const { id } = definition;
     if (!CORE_ID.test(id) || id === 'testbed') {
       throw new Error(`invalid core id '${id}': ^[a-z][a-z0-9-]*$, and not 'testbed'`);
     }
-    if (this.cores.has(id)) throw new Error(`core '${id}' is already registered`);
+    if (this.order.includes(id)) throw new Error(`core '${id}' is already registered`);
+    if (isExternal(definition)) {
+      const { bus, runs, log } = this.options;
+      this.externals.set(
+        id,
+        new ExternalCore(definition, {
+          bus,
+          runs,
+          log,
+          env: this.env,
+          cwd: this.options.cwd ?? process.cwd(),
+        }),
+      );
+      this.order.push(id);
+      this.followRuns();
+      return;
+    }
 
     const config = this.validate(definition, definition.defaultConfig(this.env));
     const { bus, runs, log } = this.options;
@@ -152,16 +208,38 @@ export class CoreHost {
     };
     hosted.instance = definition.create(ctx);
     this.cores.set(id, hosted as HostedCore);
+    this.order.push(id);
   }
 
-  /** Starts every core whose config says `autoStart`. */
+  /**
+   * Boot: external cores' processes are spawned and initialized, then every
+   * core whose config says `autoStart` starts.
+   */
   async startAutoStart(): Promise<void> {
-    for (const [id, core] of this.cores) {
-      if (core.config.autoStart) await this.start(id);
+    for (const id of this.order) {
+      const external = this.externals.get(id);
+      if (external) {
+        await external.init();
+        if (external.autoStart() && external.state().state !== 'error') await external.start();
+        continue;
+      }
+      if (this.get(id).config.autoStart) await this.start(id);
     }
   }
 
+  /** Ends every external core's processes (after `stopAll`, at shutdown). */
+  async shutdown(): Promise<void> {
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    await Promise.all([...this.externals.values()].map((external) => external.shutdown()));
+  }
+
   async start(id: string): Promise<CoreStatus> {
+    const external = this.externals.get(id);
+    if (external) {
+      await external.start();
+      return this.status(id);
+    }
     const core = this.get(id);
     if (core.state === 'running' || core.state === 'starting') return this.status(id);
     core.abort = new AbortController();
@@ -176,6 +254,11 @@ export class CoreHost {
   }
 
   async stop(id: string): Promise<CoreStatus> {
+    const external = this.externals.get(id);
+    if (external) {
+      await external.stop();
+      return this.status(id);
+    }
     const core = this.get(id);
     if (core.state !== 'running') return this.status(id);
     this.transition(id, core, 'stopping');
@@ -191,11 +274,16 @@ export class CoreHost {
 
   /** Stops every running core — graceful shutdown. */
   async stopAll(): Promise<void> {
-    for (const id of this.cores.keys()) await this.stop(id);
+    for (const id of this.order) await this.stop(id);
   }
 
   /** Clears the core's state and counters and starts its fault `times` over. */
   async reset(id: string): Promise<CoreStatus> {
+    const external = this.externals.get(id);
+    if (external) {
+      await external.reset();
+      return this.status(id);
+    }
     const core = this.get(id);
     await core.instance.reset?.();
     core.faults.reset();
@@ -203,6 +291,8 @@ export class CoreHost {
   }
 
   getConfig(id: string): BaseCoreConfig {
+    const external = this.externals.get(id);
+    if (external) return external.getConfig();
     return structuredClone(this.get(id).config);
   }
 
@@ -215,6 +305,8 @@ export class CoreHost {
     id: string,
     patch: Record<string, unknown>,
   ): Promise<'applied' | 'restart-required'> {
+    const external = this.externals.get(id);
+    if (external) return external.setConfig(patch);
     const core = this.get(id);
     const next = this.validate(core.definition, { ...core.config, ...patch });
     core.config = next;
@@ -223,6 +315,16 @@ export class CoreHost {
   }
 
   status(id: string): CoreStatus {
+    const external = this.externals.get(id);
+    if (external) {
+      return {
+        id,
+        kind: external.kind,
+        title: external.title,
+        ...external.state(),
+        ...external.status(),
+      };
+    }
     const core = this.get(id);
     const { kind, title } = core.definition;
     return {
@@ -235,21 +337,60 @@ export class CoreHost {
     };
   }
 
-  /** The registered definitions, in registration order (for the manifest). */
-  definitions(): CoreDefinition[] {
-    return [...this.cores.values()].map((core) => core.definition);
+  /** What the manifest shows for each core, in registration order. */
+  describeAll(): CoreDescription[] {
+    return this.order.map((id) => this.describe(id));
+  }
+
+  describe(id: string): CoreDescription {
+    const external = this.externals.get(id);
+    if (external) {
+      return {
+        id,
+        kind: external.kind,
+        title: external.title,
+        external: true,
+        ...external.describe(),
+      };
+    }
+    const { definition } = this.get(id);
+    return {
+      id,
+      kind: definition.kind,
+      title: definition.title,
+      external: false,
+      configSchema: toJsonSchema(definition.configSchema),
+      actions: Object.entries(definition.actions ?? {}).map(([name, action]) => ({
+        name,
+        title: action.title,
+        description: action.description,
+        mutating: action.mutating,
+        surfaces: action.surfaces ?? ['rest', 'mcp', 'ui'],
+        inputSchema: toJsonSchema(action.input),
+      })),
+      faults: definition.faults ?? [],
+    };
+  }
+
+  /** Whether the action needs the lease; `undefined` for an unknown core or action. */
+  actionMutating(id: string, name: string): boolean | undefined {
+    const external = this.externals.get(id);
+    if (external) return external.actionMutating(name);
+    return this.cores.get(id)?.definition.actions?.[name]?.mutating;
   }
 
   ids(): string[] {
-    return [...this.cores.keys()];
+    return [...this.order];
   }
 
   statusAll(): CoreStatus[] {
-    return [...this.cores.keys()].map((id) => this.status(id));
+    return this.order.map((id) => this.status(id));
   }
 
   /** Validates the input, runs the action, validates the output. */
   async invokeAction(id: string, name: string, input: unknown, caller: Caller): Promise<unknown> {
+    const external = this.externals.get(id);
+    if (external) return external.invokeAction(name, input, caller);
     const core = this.get(id);
     const action = core.definition.actions?.[name];
     if (!action) throw new NotFoundError('action', `${id}.${name}`);
@@ -265,6 +406,20 @@ export class CoreHost {
       );
     }
     return action.output.parse(await action.run(core.instance, parsed, caller));
+  }
+
+  /** External cores hear about every Run change (`runChanged`, protocol §4.3). */
+  private followRuns(): void {
+    if (this.unsubscribe) return;
+    const { bus, runs } = this.options;
+    this.unsubscribe = bus.subscribe((event) => {
+      if (event.kind !== 'testbed.run.started' && event.kind !== 'testbed.run.ended') return;
+      const started = event.kind === 'testbed.run.started';
+      const payload = event.payload as { runId?: string; seed?: string };
+      const runId = started ? (payload.runId ?? null) : null;
+      const seed = started ? (payload.seed ?? runs.bootSeed()) : runs.bootSeed();
+      for (const external of this.externals.values()) void external.runChanged(runId, seed);
+    });
   }
 
   private get(id: string): HostedCore {

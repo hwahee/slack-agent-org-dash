@@ -59,6 +59,11 @@ export class RunManager {
     return this.open ? structuredClone(this.open.meta) : null;
   }
 
+  /** The seed of this boot (used outside a Run). */
+  bootSeed(): string {
+    return this.bootRng.seed;
+  }
+
   /** The open Run's rng, or the boot rng outside a Run (docs/testbed/faults-and-seed.md §2). */
   rng(): SeededRng {
     return this.open?.rng ?? this.bootRng;

@@ -16,7 +16,6 @@ import {
   type TestbedEvent,
 } from '@shared/testbed/events';
 import type { RunMeta } from '@shared/testbed/runs';
-import { toJsonSchema } from '@shared/validation';
 
 import { NotFoundError } from '../../lib/errors';
 import type { BaseCoreConfig } from '../core';
@@ -90,25 +89,18 @@ export class ControlService {
       instanceId: bus.instanceId,
       baseVersion: this.info.baseVersion,
       publicUrl: this.info.publicUrl,
-      cores: host.definitions().map((definition) => {
-        const status = host.status(definition.id);
+      cores: host.describeAll().map((core) => {
+        const status = host.status(core.id);
         return {
-          id: definition.id,
-          kind: definition.kind,
-          title: definition.title,
+          id: core.id,
+          kind: core.kind,
+          title: core.title,
           state: status.state,
           replicas: 1,
           endpoints: status.endpoints,
-          actions: Object.entries(definition.actions ?? {}).map(([name, action]) => ({
-            name,
-            title: action.title,
-            description: action.description,
-            mutating: action.mutating,
-            surfaces: action.surfaces ?? ['rest', 'mcp', 'ui'],
-            inputSchema: toJsonSchema(action.input),
-          })),
-          configSchema: toJsonSchema(definition.configSchema),
-          faults: definition.faults ?? [],
+          actions: core.actions,
+          configSchema: core.configSchema,
+          faults: core.faults,
         };
       }),
       control: { rest: '/testbed/api', mcp: '/testbed/mcp', ws: '/testbed/ws' },
@@ -311,9 +303,7 @@ export class ControlService {
   }
 
   invokeAction(core: string, name: string, input: unknown, caller: Caller): Promise<unknown> {
-    const mutating =
-      this.rt.host.definitions().find((definition) => definition.id === core)?.actions?.[name]
-        ?.mutating ?? true;
+    const mutating = this.rt.host.actionMutating(core, name) ?? true;
     const fn = `${core}.${name}`;
     if (!mutating) {
       this.read(caller, fn);

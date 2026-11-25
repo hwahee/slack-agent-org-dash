@@ -51,6 +51,8 @@ const controlPlane = createControlPlane(testbed, { config: testbedConfig, server
 stopHooks.push(async () => {
   await controlPlane.dispose();
   await testbed.host.stopAll();
+  // External cores: shutdown → SIGTERM → SIGKILL, so no child process outlives the server.
+  await testbed.host.shutdown();
 });
 
 // ── Web role ────────────────────────────────────────────────────────────────

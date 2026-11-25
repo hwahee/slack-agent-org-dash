@@ -49,3 +49,21 @@ export function redact(value: unknown, extraKeys: readonly string[] = []): unkno
   };
   return walk(value);
 }
+
+/**
+ * `key: value` / `key=value` in a line of text (an external core's stderr)
+ * whose key is a secret one → the value masked like {@link maskSecret}.
+ * `Authorization: Bearer abc…` keeps `Authorization: ` and masks the rest of
+ * the value (up to `,` `;` `"` or the end of the line).
+ */
+const SECRET_IN_TEXT =
+  /\b(authorization|cookie|set-cookie|[\w-]*-key|[\w-]*(?:token|secret|password)[\w-]*)(\s*[:=]\s*)([^\r\n,;"]+)/gi;
+
+export function redactText(line: string): string {
+  return line.replace(SECRET_IN_TEXT, (_match, key: string, separator: string, value: string) => {
+    const trimmed = value.trim();
+    return trimmed === ''
+      ? `${key}${separator}${value}`
+      : `${key}${separator}${maskSecret(trimmed)}`;
+  });
+}

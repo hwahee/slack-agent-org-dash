@@ -40,16 +40,19 @@ interface TestbedEvent<P = unknown> {
 
 ### 2.1 예약된 kind (`testbed.*`)
 
-| kind                                                            | 뜻                    |
-| --------------------------------------------------------------- | --------------------- |
-| `testbed.core.state`                                            | 코어 상태 변화        |
-| `testbed.control.invoked`                                       | 누가 어떤 조작을 했나 |
-| `testbed.run.started` / `testbed.run.ended`                     | Run 시작·종료         |
-| `testbed.lease.acquired` / `.released` / `.expired` / `.denied` | 제어 락 변화          |
-| `testbed.check.evaluated`                                       | 판정 결과             |
-| `testbed.fault.injected`                                        | 결함 주입             |
+| kind                                                                         | 뜻                                                                                                                            |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `testbed.core.state`                                                         | 코어 상태 변화                                                                                                                |
+| `testbed.control.invoked`                                                    | 누가 어떤 조작을 했나                                                                                                         |
+| `testbed.run.started` / `testbed.run.ended`                                  | Run 시작·종료                                                                                                                 |
+| `testbed.lease.acquired` / `.released` / `.expired` / `.denied`              | 제어 락 변화                                                                                                                  |
+| `testbed.check.evaluated`                                                    | 판정 결과                                                                                                                     |
+| `testbed.fault.injected`                                                     | 결함 주입                                                                                                                     |
+| `testbed.core.process.spawned` / `.exited` / `.restarting` / `.unresponsive` | 외부 코어 프로세스([external-core-protocol.md](external-core-protocol.md) §8.1). `core`는 그 외부 코어, `replica`는 해당 복제 |
 
 코어는 `testbed.*` kind를 직접 내보내지 않습니다. 공통 런타임이 냅니다.
+
+- 외부 코어의 복제에 관한 이벤트(`testbed.core.state`, `testbed.fault.injected`, 그 코어의 이벤트)에는 `replica`(`r0`, `r1` …)가 붙습니다. 복제 전체 상태가 바뀔 때의 `testbed.core.state`에는 `replica`가 없습니다.
 
 ## 3. 인스턴스와 커서
 

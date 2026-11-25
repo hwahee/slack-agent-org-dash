@@ -53,6 +53,29 @@ describe('lease for MCP sessions', () => {
     expect(codes).toEqual(['LEASE_HELD', 'LOCKED']);
   });
 
+  test('a new session of the same client is told how to free its old session lease', () => {
+    const { lease } = setup();
+    lease.authorize(agent, 'start', true);
+    const denied = (caller: typeof agent | typeof otherAgent) => {
+      try {
+        lease.authorize(caller, 'stop', true);
+        throw new Error('allowed');
+      } catch (error) {
+        return error as TestbedError;
+      }
+    };
+    const reconnected = denied({ ...agent, sessionId: 'sess-cccc-3333' });
+    expect(reconnected.code).toBe('LEASE_HELD');
+    expect(reconnected.details).toMatchObject({ sameClient: true });
+    expect(reconnected.message).toContain('Claude Code');
+    expect(reconnected.message).toContain('bun run testbed:release');
+    expect(reconnected.message).toContain('release_control');
+    const other = denied(otherAgent);
+    expect(other.details).not.toHaveProperty('sameClient');
+    expect(other.message).not.toContain('testbed:release');
+    expect(lease.view()?.holder).toBe('sess');
+  });
+
   test('ending the MCP session releases its lease', () => {
     const { lease, bus } = setup();
     lease.authorize(agent, 'start', true);

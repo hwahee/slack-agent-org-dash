@@ -195,10 +195,25 @@ export class LeaseManager {
       summary: `${fn} by ${caller.actor} denied: lease held by ${who} (${left} left)`,
       payload: { fn, code, caller: publicCaller(caller), lease: view },
     });
+    // An agent that reconnected (Claude Code restarted) meets the lease its
+    // old session still holds: same client name, another session.
+    const sameClient =
+      code === 'LEASE_HELD' &&
+      view?.actor === caller.actor &&
+      view.name !== undefined &&
+      view.name === caller.name &&
+      this.holder?.sessionId !== undefined &&
+      caller.sessionId !== undefined;
     const message =
       code === 'LOCKED'
         ? `${who}이(가) 제어 중이라 조작할 수 없음(남은 시간 ${left}). 보기는 계속 가능. 제어가 끝나거나 만료되면 다시 시도`
-        : `다른 보유자가 제어 락을 가짐(${who}, 남은 시간 ${left}). 보유자가 해제하거나 만료된 뒤 다시 시도`;
-    return new TestbedError(code, message, { holder: view, remainingMs: view?.remainingMs ?? 0 });
+        : sameClient
+          ? `같은 이름(${view.name})의 다른 MCP 세션 ${view.holder}이(가) 제어 락을 가짐(남은 시간 ${left}). 다시 연결하기 전의 옛 세션이면 그 세션은 호출이 없어도 남은 시간 동안 락을 쥠. 옛 세션이 아직 열려 있으면 그쪽에서 release_control, 아니면 테스트베드 서버가 도는 곳에서 \`bun run testbed:release\`로 풀고 다시 시도`
+          : `다른 보유자가 제어 락을 가짐(${who}, 남은 시간 ${left}). 보유자가 해제하거나 만료된 뒤 다시 시도`;
+    return new TestbedError(code, message, {
+      holder: view,
+      remainingMs: view?.remainingMs ?? 0,
+      ...(sameClient ? { sameClient: true } : {}),
+    });
   }
 }

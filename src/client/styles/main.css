@@ -1060,11 +1060,6 @@ a {
   accent-color: var(--color-primary);
 }
 
-.checkbox__input:checked + .checkbox__label {
-  text-decoration: line-through;
-  color: var(--color-text-muted);
-}
-
 /* ── Badge / Alert / Spinner / Card ───────────────────────────────────────── */
 .badge {
   display: inline-block;

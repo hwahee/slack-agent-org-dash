@@ -56,7 +56,15 @@ describe('fault rules ↔ table', () => {
   });
 
   test('round trip: rules → rows → the same rules', () => {
-    expect(rowsToRules(rulesToRows(rules))).toEqual({ rules, errors: [] });
+    const working = rules.filter((rule) => rule.id !== 'f5');
+    expect(rowsToRules(rulesToRows(working))).toEqual({ rules: working, errors: [] });
+  });
+
+  test('a rule with neither an effect nor a delay is reported on its effect cell', () => {
+    const { errors } = rowsToRules([emptyRow('f5')]);
+    expect(errors).toEqual([
+      { row: 0, column: 'effect', message: '효과나 지연 중 하나는 있어야 함' },
+    ]);
   });
 
   test('cells it cannot read are reported by row and column', () => {

@@ -38,7 +38,8 @@ export interface FaultRule {
 /**
  * What the schema cannot say about a core's `faults` list, checked by both
  * hosts (in-proc and external) on every config: ids are unique (events and
- * checks tell rules apart by id), and a delay range must not run backwards.
+ * checks tell rules apart by id), every rule does something (a delay or an
+ * effect), and a delay range must not run backwards.
  */
 export function faultRulesIssues(rules: readonly FaultRule[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -55,6 +56,13 @@ export function faultRulesIssues(rules: readonly FaultRule[]): ValidationIssue[]
       });
     }
     const delay = rule.delayMs;
+    if (delay === undefined && rule.error === undefined && !rule.disconnect && !rule.corrupt) {
+      issues.push({
+        path: `faults.${index}`,
+        message: `규칙 '${rule.id}'에 효과(error·disconnect·corrupt)도 delayMs도 없음. 아무 일도 하지 않는 규칙`,
+        code: 'no_effect',
+      });
+    }
     if (typeof delay === 'object' && delay.min > delay.max) {
       issues.push({
         path: `faults.${index}.delayMs`,

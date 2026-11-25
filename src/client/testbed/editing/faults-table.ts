@@ -158,6 +158,8 @@ export function rowsToRules(rows: readonly FaultRow[]): {
       rule.corrupt = true;
     }
 
+    if (delay === '' && row.effect === '') fail('effect', '효과나 지연 중 하나는 있어야 함');
+
     if (row.times.trim() !== '') {
       const times = Number(row.times);
       if (!Number.isInteger(times) || times < 1) fail('times', 'integer ≥ 1');

@@ -49,6 +49,17 @@ describe('CoreHost', () => {
     expect(h.getConfig('sample').faults).toEqual([]);
   });
 
+  test('a fault rule that does nothing (no effect, no delay) is a ValidationError', async () => {
+    const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
+    h.register(sampleCore);
+    const error = await h
+      .setConfig('sample', { faults: [{ id: 'f1', times: 1 }] })
+      .catch((caught: unknown) => caught);
+    expect((error as ValidationError).issues).toEqual([
+      expect.objectContaining({ path: 'faults.0', code: 'no_effect' }),
+    ]);
+  });
+
   test('two fault rules with the same id are a ValidationError', async () => {
     const { host: h } = host({ SAMPLE_PORT: '0', SAMPLE_AUTO_START: 'false' });
     h.register(sampleCore);

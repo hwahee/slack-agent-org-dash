@@ -158,6 +158,7 @@ export const TESTID = {
     agentTimeline: {
       root: 'testbed.agent-timeline',
       item: (eventId: string) => `testbed.agent-timeline.item.${eventId}`,
+      jumpLatest: 'testbed.agent-timeline.jump-latest',
     },
     /** Under 1024 px: the buttons that open the side columns as overlays. */
     openCores: 'testbed.open-cores',

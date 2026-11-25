@@ -401,6 +401,7 @@ export class ControlService {
       kind: 'testbed.control.invoked',
       level: result === 'ok' ? 'info' : 'warn',
       actor: caller.actor,
+      caller,
       summary: `${caller.actor} ${fn} ${result === 'ok' ? 'ok' : `failed (${result})`}`.slice(
         0,
         200,

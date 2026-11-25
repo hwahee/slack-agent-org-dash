@@ -790,6 +790,11 @@ a {
   cursor: pointer;
 }
 
+.tb-timeline__viewport {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 .tb-timeline__who {
   font-weight: var(--font-weight-heading);
 }

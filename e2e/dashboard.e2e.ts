@@ -217,6 +217,8 @@ test('7. fault rules: a disconnect rule closes the connection, and the log shows
 
 test('8. agent timeline: an agent taking and giving back the lease', async ({ page }) => {
   await openDashboard(page);
+  // A person's operation stays out of the agent's timeline.
+  expect((await api('POST', '/cores/sample/reset')).status).toBe(200);
   const lease = await takeLease();
   await lease.release();
   await page.getByRole('tab', { name: 'Agent timeline' }).click();
@@ -232,6 +234,7 @@ test('8. agent timeline: an agent taking and giving back the lease', async ({ pa
       name: new RegExp(`agent · ${short} testbed\\.lease\\.released`),
     }),
   ).toBeVisible();
+  await expect(timeline).not.toContainText('human');
 });
 
 test('core card: start and stop are enabled only when they would do something', async ({

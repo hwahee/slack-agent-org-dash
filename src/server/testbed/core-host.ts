@@ -10,6 +10,8 @@
  * in-proc ones behind the same methods; each is an `ExternalCore` that owns
  * its processes. The control service sees no difference.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type { CoreLog } from '@shared/testbed/control';
 import type { CoreKind, CoreState, CoreStatus, FaultKind } from '@shared/testbed/core';
 import type { Caller } from '@shared/testbed/events';
@@ -28,6 +30,9 @@ import { FaultDecider } from './faults';
 import type { RunManager } from './runs/runs';
 
 const IN_PROC_LOG_NOTE = 'in-proc 코어는 프로세스 로그가 없음';
+
+/** The caller of the in-proc action running in this async flow. */
+const actionCaller = new AsyncLocalStorage<Caller>();
 
 const CORE_ID = /^[a-z][a-z0-9-]*$/;
 
@@ -205,7 +210,18 @@ export class CoreHost {
           throw new Error(`core '${id}' may only emit '${id}.*' kinds, got '${event.kind}'`);
         }
         if (event.level === 'debug' && hosted.config.eventLevel !== 'debug') return;
-        bus.emit({ ...event, core: id, actor: event.actor ?? 'product' });
+        // What an action does in its caller's name (the core gave the
+        // caller's actor) carries that caller, so two agents tell apart.
+        const running = actionCaller.getStore();
+        const caller =
+          event.caller ??
+          (running !== undefined && event.actor === running.actor ? running : undefined);
+        bus.emit({
+          ...event,
+          core: id,
+          actor: event.actor ?? caller?.actor ?? 'product',
+          ...(caller === undefined ? {} : { caller }),
+        });
       },
       log,
       get rng() {
@@ -479,7 +495,9 @@ export class CoreHost {
         },
       );
     }
-    return action.output.parse(await action.run(core.instance, parsed, caller));
+    return action.output.parse(
+      await actionCaller.run(caller, () => action.run(core.instance, parsed, caller)),
+    );
   }
 
   /** External cores hear about every Run change (`runChanged`, protocol §4.3). */

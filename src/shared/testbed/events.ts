@@ -38,6 +38,12 @@ export interface TestbedEvent<P = unknown> {
   kind: string;
   level: EventLevel;
   actor: Actor;
+  /**
+   * Who it was done for, when a control-service caller caused it (a control
+   * call, a check, a Run change, a core action). Ids are the first 4
+   * characters only (`publicCaller`).
+   */
+  caller?: Caller;
   correlationId?: string;
   latencyMs?: number;
   /** One line, at most 200 characters. Required. */

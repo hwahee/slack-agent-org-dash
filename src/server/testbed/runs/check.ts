@@ -108,6 +108,7 @@ export async function runCheck(
     kind: 'testbed.check.evaluated',
     level: pass ? 'info' : 'warn',
     actor: caller.actor,
+    caller,
     summary: `check${label === undefined ? '' : ` '${label}'`} ${pass ? 'passed' : 'failed'}: ${matching.length} matched (expected ${expected})`,
     payload: {
       ...(label === undefined ? {} : { label }),

@@ -100,6 +100,7 @@ export class RunManager {
       core: 'testbed',
       kind: 'testbed.run.started',
       actor: caller.actor,
+      caller,
       summary: `run ${meta.runId} '${meta.label}' started by ${caller.actor} (seed ${seed})`,
       payload: { runId: meta.runId, label: meta.label, seed, openedBy: caller },
     });
@@ -114,6 +115,7 @@ export class RunManager {
       core: 'testbed',
       kind: 'testbed.run.ended',
       actor: caller.actor,
+      caller,
       summary: `run ${open.meta.runId} ended by ${caller.actor} (${reason})`,
       payload: { runId: open.meta.runId, endReason: reason, endedBy: caller },
     });

@@ -13,7 +13,7 @@ import { testbedApi } from '../../api/endpoints';
 import { useI18n } from '../../i18n/locale-context';
 import { TESTID } from '../../testing/testids';
 import { CopyButton } from '../dashboard/copy-button';
-import { localTime } from './event-display';
+import { callerLabel, localTime } from './event-display';
 import { JsonViewer } from './json-viewer';
 import { useSelection } from './selection';
 
@@ -120,6 +120,14 @@ export function DetailPanel() {
                 </dd>
               </div>
             ))}
+            {event.caller !== undefined && (
+              <div>
+                <dt className="muted">caller</dt>
+                <dd>
+                  <code>{callerLabel(event)}</code>
+                </dd>
+              </div>
+            )}
           </dl>
           <div data-testid={TESTID.testbed.detail.payload}>
             <JsonViewer value={event.payload} root="payload" />

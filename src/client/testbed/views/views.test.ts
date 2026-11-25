@@ -162,10 +162,12 @@ describe('event display', () => {
     expect(isRedacted(42)).toBe(false);
   });
 
-  test('the agent timeline: agent events, control calls and lease changes only', () => {
+  test('the agent timeline: agent events, control calls and lease changes, not people', () => {
     const kept = [
       event({ actor: 'agent', kind: 'sample.broadcast.sent' }),
-      event({ actor: 'human', kind: 'testbed.control.invoked' }),
+      event({ actor: 'agent', kind: 'testbed.check.evaluated' }),
+      event({ actor: 'agent', kind: 'testbed.control.invoked' }),
+      event({ actor: 'ci', kind: 'testbed.control.invoked' }),
       event({ actor: 'system', kind: 'testbed.lease.expired' }),
       event({ actor: 'ci', kind: 'testbed.lease.acquired' }),
     ];
@@ -174,6 +176,9 @@ describe('event display', () => {
       event({ actor: 'system', kind: 'testbed.core.state' }),
       event({ actor: 'system', kind: 'testbed.run.started' }),
       event({ actor: 'human', kind: 'testbed.controls.changed' }),
+      // The person at the dashboard: their clicks are in the event log.
+      event({ actor: 'human', kind: 'testbed.control.invoked' }),
+      event({ actor: 'human', kind: 'testbed.lease.denied' }),
     ];
     expect([...kept, ...dropped].filter(isAgentTimelineEvent)).toEqual(kept);
   });
@@ -197,6 +202,25 @@ describe('event display', () => {
         }),
       ),
     ).toBe('ci · 9f3c');
+    // Agent events past the control call carry the caller in the envelope.
+    expect(
+      callerLabel(
+        event({
+          kind: 'sample.broadcast.sent',
+          actor: 'agent',
+          caller: { actor: 'agent', name: 'qa-claude', sessionId: '074a' },
+        }),
+      ),
+    ).toBe('qa-claude · 074a');
+    expect(
+      callerLabel(
+        event({
+          kind: 'testbed.check.evaluated',
+          actor: 'agent',
+          caller: { actor: 'agent', leaseId: '9f3c' },
+        }),
+      ),
+    ).toBe('agent · 9f3c');
     expect(callerLabel(event({ actor: 'agent', kind: 'sample.broadcast.sent' }))).toBe('agent');
   });
 

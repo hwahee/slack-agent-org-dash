@@ -25,6 +25,7 @@
 
 - 모든 함수는 `caller: { actor, sessionId?, leaseId?, name? }`를 받습니다. `sessionId`는 MCP 세션 id, `leaseId`는 REST로 잡은 락의 id, `name`은 표시 이름(예: MCP `clientInfo.name`)입니다.
 - 조작성 함수가 불리면 `testbed.control.invoked` 이벤트가 남습니다(함수 이름, 입력 요약, caller, 결과).
+- 호출자가 일으킨 이벤트(조작, check, Run 시작·종료, in-proc 코어의 액션)에는 봉투의 `caller`가 붙습니다. id는 앞 4자만 남습니다([events.md](events.md) §2).
 
 ### 1.2 이벤트 필터
 

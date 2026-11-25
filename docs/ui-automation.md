@@ -94,6 +94,7 @@
 | `testbed.runs.label` / `.seed` / `.end-active`                                                 | 시작 폼 입력(`.end-active`는 열린 Run이 있을 때만)                                                                                              |
 | `testbed.runs.item.<runId>` / `.summary` / `.export`                                           | 지난 Run, 고른 Run의 요약과 내보내기 링크                                                                                                       |
 | `testbed.agent-timeline` / `testbed.agent-timeline.item.<eventId>`                             | 에이전트 타임라인과 항목                                                                                                                        |
+| `testbed.agent-timeline.jump-latest`                                                           | 타임라인의 "새 이벤트 n건 · 맨 아래로"(따라가기를 멈췄을 때만)                                                                                  |
 | `testbed.open-cores` / `testbed.open-detail`                                                   | 1024px 미만에서 코어 열·상세를 여는 버튼                                                                                                        |
 | `testbed.cores-overlay` / `testbed.detail-overlay`                                             | 그때 열리는 사이드바·바텀시트(`.panel`, `.close` 파생)                                                                                          |
 

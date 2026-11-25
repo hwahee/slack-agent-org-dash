@@ -9,7 +9,7 @@ import { join } from 'node:path';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { EventLine, TestbedEvent } from '@shared/testbed/events';
+import type { Caller, EventLine, TestbedEvent } from '@shared/testbed/events';
 
 import { sampleCore } from '../cores/sample';
 import { startTestServer, TcpClient, waitForEvent } from '../testing';
@@ -260,6 +260,31 @@ describe('a test session', () => {
       summary: { byKind: { 'sample.data.echoed': 1 } },
     });
     expect(ended.content[0]?.text).toContain('sample.data.echoed=1');
+  });
+
+  test("what an agent did carries its name and session's first 4 characters, so two agents tell apart", async () => {
+    const { connect, tcp, events, runtime } = await startTestbed();
+    const agent = await connect('qa-claude');
+    const short = agent.sessionId.slice(0, 4);
+    await tcp();
+    await agent.call('start_run', { label: 'who' });
+    await agent.call('sample_broadcast', { text: 'hi' });
+    await agent.call('check', { filter: { kind: 'sample.broadcast.sent' }, expect: { count: 1 } });
+    await agent.call('end_run');
+
+    const caller: Caller = { actor: 'agent', name: 'qa-claude', sessionId: short };
+    for (const kind of [
+      'testbed.control.invoked',
+      'testbed.run.started',
+      'sample.broadcast.sent',
+      'testbed.check.evaluated',
+      'testbed.run.ended',
+    ]) {
+      const [event] = events(kind);
+      expect({ kind, caller: event?.caller }).toEqual({ kind, caller });
+    }
+    // Never the whole session id: it would let anyone act as the holder.
+    expect(JSON.stringify(runtime.bus.buffered())).not.toContain(agent.sessionId);
   });
 
   test('wait_for with a cap above 120 s is cut, not refused', async () => {

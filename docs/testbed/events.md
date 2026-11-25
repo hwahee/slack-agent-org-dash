@@ -27,6 +27,7 @@ interface TestbedEvent<P = unknown> {
   kind: string; // '<core>.<대상>.<동사>' 예: 'echo.connection.opened', 'llm.completion.responded'
   level: 'debug' | 'info' | 'warn' | 'error';
   actor: 'product' | 'human' | 'agent' | 'ci' | 'system';
+  caller?: Caller; // 제어 서비스의 호출자가 일으킨 일이면 그 호출자. id는 앞 4자만
   correlationId?: string; // 요청과 응답, 단계와 그 결과를 묶음
   latencyMs?: number; // 있으면 공통 통계 패널이 지연을 집계
   summary: string; // 한 줄 요약 — 로그 표시와 에이전트 판독용 (필수)
@@ -36,6 +37,7 @@ interface TestbedEvent<P = unknown> {
 ```
 
 - **kind**: `<core>.<대상>.<동사>`. 동사는 과거형입니다(`opened`, `received`, `responded`, `failed`). 모두 소문자이고 단어는 `-`로 잇습니다.
+- **caller**: 제어 서비스 함수를 부른 호출자(`{ actor, name?, sessionId?, leaseId? }`, [control-plane.md](control-plane.md) §1.1)가 일으킨 이벤트에 붙습니다: `testbed.control.invoked`, `testbed.check.evaluated`, `testbed.run.started`·`ended`, 그리고 in-proc 코어가 액션을 실행하는 동안 그 호출자의 actor로 낸 이벤트(예: `sample.broadcast.sent`). 같은 actor의 에이전트가 둘이어도 `name`과 세션 앞 4자로 구분합니다. 전체 id를 알면 그 보유자로 행세할 수 있으므로, 버스가 `emit` 때 `sessionId`·`leaseId`를 앞 4자로 자릅니다(`publicCaller`).
 - **summary**: 사람이 로그를 훑을 때와 에이전트가 적은 토큰으로 상황을 파악할 때 핵심입니다. 한 줄, 200자 이내입니다. 스펙의 이벤트 표에 kind별 형식을 적습니다. 예: `echo 32B from 127.0.0.1:51234 (conn c-7)`.
 
 ### 2.1 예약된 kind (`testbed.*`)

@@ -31,6 +31,23 @@ describe('EventBus envelope', () => {
     expect('truncated' in event).toBe(false);
   });
 
+  test('a caller is recorded with only the first 4 characters of its ids', () => {
+    const bus = new EventBus();
+    const event = bus.emit(
+      input({
+        actor: 'agent',
+        caller: { actor: 'agent', name: 'qa-claude', sessionId: '074a9c1e', leaseId: 'f00dbeef' },
+      }),
+    );
+    expect(event.caller).toEqual({
+      actor: 'agent',
+      name: 'qa-claude',
+      sessionId: '074a',
+      leaseId: 'f00d',
+    });
+    expect('caller' in bus.emit(input())).toBe(false);
+  });
+
   test('hands every event to subscribers until they unsubscribe', () => {
     const bus = new EventBus();
     const seen: number[] = [];

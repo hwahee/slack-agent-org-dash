@@ -38,14 +38,14 @@ export function fromCoreCall(core: string, replica: string, error: unknown): Err
   if (error instanceof RpcTimeoutError) {
     return new TestbedError(
       'CORE_TIMEOUT',
-      `코어 ${core}(${replica})가 ${error.method}에 ${error.timeoutMs}ms 안에 답하지 않음. 코어 로그를 보고 다시 시도하거나 requestTimeoutMs를 늘림`,
+      `코어(${core} ${replica})가 ${error.method}에 ${error.timeoutMs}ms 안에 답하지 않음. 코어 로그를 보고 다시 시도하거나 requestTimeoutMs를 늘림`,
       { core, replica, method: error.method, timeoutMs: error.timeoutMs },
     );
   }
   if (error instanceof RpcClosedError) {
     return new TestbedError(
       'CORE_ERROR',
-      `코어 ${core}(${replica})의 프로세스가 ${error.method}에 답하기 전에 끝남. 감시가 다시 띄운 뒤 다시 시도`,
+      `코어(${core} ${replica})의 프로세스가 ${error.method}에 답하기 전에 끝남. 감시가 다시 띄운 뒤 다시 시도`,
       { core, replica, method: error.method, coreCode: 'EXITED' },
     );
   }

@@ -20,7 +20,7 @@ startRun({ label: string, seed?: string, configOverrides?: Record<coreId, Partia
 
 - 인스턴스마다 **동시에 열린 Run은 하나**입니다.
 - 이미 열려 있으면 `RUN_ACTIVE` 오류를 내고, 그 Run의 정보(id, label, 연 주체, 시작 시각)를 `details`에 담습니다.
-  - 오류 문장 예: "Run이 이미 열려 있음(run-7-k3f9, 'gw-retry', human이 14:02에 엶). 닫고 새로 시작하려면 `start_run`에 `endActive: true`".
+  - 오류 문장 예: "Run이 이미 열려 있음(run-7-k3f9, 'gw-retry', 연 쪽 human, 14:02 UTC에 엶). 닫고 새로 시작하려면 `start_run`에 `endActive: true`".
 - `endActive: true`를 주면 열린 Run을 닫고(`endReason: 'replaced'`) 새 Run을 시작합니다. 누가 연 Run이든 닫을 수 있습니다.
 
 ### 1.3 종료

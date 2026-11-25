@@ -75,7 +75,7 @@ export class RunManager {
         const { runId, label, openedBy, startedAt } = this.open.meta;
         throw new TestbedError(
           'RUN_ACTIVE',
-          `Run이 이미 열려 있음(${runId}, '${label}', ${openedBy.actor}이 ${hhmm(startedAt)}에 엶). 닫고 새로 시작하려면 start_run에 endActive: true`,
+          `Run이 이미 열려 있음(${runId}, '${label}', 연 쪽 ${openedBy.actor}, ${hhmm(startedAt)} UTC에 엶). 닫고 새로 시작하려면 start_run에 endActive: true`,
           { runId, label, openedBy, startedAt },
         );
       }

@@ -488,7 +488,7 @@ export class CoreHost {
     if (core.state !== 'running') {
       throw new TestbedError(
         'CORE_NOT_RUNNING',
-        `코어 ${id}가 running이 아님(${core.state}). start 후 다시 시도`,
+        `코어(${id})가 running 상태가 아님(지금 ${core.state}). start 후 다시 시도`,
         {
           core: id,
           state: core.state,

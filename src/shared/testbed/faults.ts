@@ -51,7 +51,7 @@ export function faultRulesIssues(rules: readonly FaultRule[]): ValidationIssue[]
     } else {
       issues.push({
         path: `faults.${index}.id`,
-        message: `규칙 id '${rule.id}'가 faults.${first}와 겹침. id는 규칙마다 달라야 함`,
+        message: `id가 '${rule.id}'인 규칙이 faults.${first}에도 있음. id는 규칙마다 달라야 함`,
         code: 'duplicate_id',
       });
     }

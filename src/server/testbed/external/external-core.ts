@@ -441,7 +441,7 @@ export class ExternalCore {
     if (notRunning) {
       throw new TestbedError(
         'CORE_NOT_RUNNING',
-        `코어 ${this.id}의 ${notRunning.id}가 running이 아님(${notRunning.state}). start 후 다시 시도`,
+        `코어(${this.id})의 복제(${notRunning.id})가 running 상태가 아님(지금 ${notRunning.state}). start 후 다시 시도`,
         { core: this.id, replica: notRunning.id, state: notRunning.state },
       );
     }

@@ -1,5 +1,5 @@
 {
-  "name": "testbed-base",
+  "name": "slack-agent-org-dash",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.2",
@@ -61,6 +61,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
+    "slack-agent-org": "github:hwahee/slack-agent-org#1a2bebadd19950cb83c979d7a2098b12f363c287",
     "zod": "^4.6.5"
   }
 }

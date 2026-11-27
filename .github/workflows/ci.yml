@@ -97,7 +97,7 @@ jobs:
       contents: read
       packages: write
     env:
-      IMAGE: ghcr.io/hwahee/testbed-base
+      IMAGE: ghcr.io/hwahee/slack-agent-org-dash
     steps:
       - uses: actions/checkout@v4
 
@@ -127,15 +127,15 @@ jobs:
             ${{ env.IMAGE }}:latest
 
       # The image must pass the smoke before it is pushed. The whole port
-      # block is published: the scenarios reach the data plane (40001) too.
+      # block is published (this testbed opens no data-plane port, the block is reserved).
       - name: MCP smoke against the image
         run: |
-          docker run -d --name testbed -p 40000-40009:40000-40009 "$IMAGE:$GITHUB_SHA"
+          docker run -d --name testbed -p 40010-40019:40010-40019 "$IMAGE:$GITHUB_SHA"
           for i in $(seq 1 60); do
-            curl -sf http://localhost:40000/api/health/ready >/dev/null && break
+            curl -sf http://localhost:40010/api/health/ready >/dev/null && break
             sleep 1
           done
-          bun run testbed:smoke --url http://localhost:40000 || { docker logs testbed; exit 1; }
+          bun run testbed:smoke --url http://localhost:40010 || { docker logs testbed; exit 1; }
 
       - name: Push
         run: docker push --all-tags "$IMAGE"

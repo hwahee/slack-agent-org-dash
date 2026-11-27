@@ -8,7 +8,7 @@ describe('loadServerConfig — testbed defaults', () => {
     const config = loadServerConfig({});
     expect(config.dbDriver).toBe('memory');
     expect(config.authDriver).toBe('none');
-    expect(config.port).toBe(40000);
+    expect(config.port).toBe(40010);
   });
 });
 

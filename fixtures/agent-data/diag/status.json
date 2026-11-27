@@ -1,0 +1,54 @@
+{
+  "v": 1,
+  "writtenAt": "2026-01-02T01:00:00.000Z",
+  "mono": 3600000,
+  "boot": "b-fixture1",
+  "pid": 1000,
+  "sections": {
+    "socket": {
+      "conn": 2,
+      "live": true,
+      "readyState": 1,
+      "bufferedAmount": 0,
+      "connectedAt": "2026-01-02T00:50:02.000Z",
+      "lastFrameAt": "2026-01-02T00:59:55.000Z",
+      "lastFrameType": "ping",
+      "framesReceived": 2,
+      "pingsReceived": 300,
+      "lastPingAt": "2026-01-02T00:59:55.000Z",
+      "lastEnvelopeAt": "2026-01-02T00:12:00.000Z",
+      "reconnects": 1
+    },
+    "inbox": {
+      "pending": 0,
+      "unseen": 0,
+      "oldestWaitingMs": null
+    },
+    "turn": {
+      "conversation": null,
+      "startedAt": null,
+      "suspended": 0,
+      "failingTurns": 0
+    },
+    "poll": {
+      "everyMs": 600000,
+      "lastStartedAt": "2026-01-02T00:50:00.000Z",
+      "lastEndedAt": "2026-01-02T00:50:06.000Z",
+      "nextAt": "2026-01-02T01:00:00.000Z"
+    },
+    "catchup": {
+      "lastRunAt": "2026-01-02T00:50:04.000Z",
+      "lastTrigger": "connected",
+      "lastSince": "2026-01-02T00:39:00.000Z",
+      "lastFound": 1,
+      "lastError": null
+    }
+  },
+  "clock": {
+    "lastGapAt": "2026-01-02T00:20:00.000Z"
+  },
+  "diag": {
+    "records": 26,
+    "writeErrors": 0
+  }
+}

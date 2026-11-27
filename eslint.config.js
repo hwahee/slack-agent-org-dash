@@ -164,6 +164,77 @@ export default tseslint.config(
       ],
     },
   },
+  // Read only (docs/spec.md §2): the agent core watches another program's
+  // folder and must never change it. Every writing, deleting or process API is
+  // refused here; the facade and Math.random rules are repeated because a
+  // later block replaces the options of the same rule.
+  {
+    files: ['src/server/testbed/cores/agent/**/*.{ts,tsx}'],
+    ignores: ['src/server/testbed/cores/agent/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'zod',
+              message:
+                'Import from @shared/validation instead. zod is an implementation detail behind the validation facade.',
+            },
+            {
+              name: 'zod/mini',
+              message:
+                'Import from @shared/validation instead. zod is an implementation detail behind the validation facade.',
+            },
+            ...['fs', 'node:fs', 'child_process', 'node:child_process'].map((name) => ({
+              name,
+              message:
+                'The agent core only reads the agent folder: use the read functions of node:fs/promises in source.ts (docs/spec.md §2).',
+            })),
+            ...['fs/promises', 'node:fs/promises'].map((name) => ({
+              name,
+              importNames: [
+                'appendFile',
+                'chmod',
+                'chown',
+                'copyFile',
+                'cp',
+                'lchown',
+                'link',
+                'lutimes',
+                'mkdir',
+                'mkdtemp',
+                'rename',
+                'rm',
+                'rmdir',
+                'symlink',
+                'truncate',
+                'unlink',
+                'utimes',
+                'writeFile',
+              ],
+              message:
+                'The agent core never writes, moves or deletes in the agent folder (docs/spec.md §2).',
+            })),
+          ],
+        },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message:
+            'Use ctx.rng: every random behaviour of a core must replay from its seed (docs/testbed/faults-and-seed.md §2).',
+        },
+        ...['write', 'spawn', 'spawnSync', '$'].map((property) => ({
+          object: 'Bun',
+          property,
+          message: 'The agent core never writes files or runs programs (docs/spec.md §2).',
+        })),
+      ],
+    },
+  },
   // bun:test's `expect(...).rejects` matchers must be awaited at runtime but
   // are typed as non-thenable — keep the awaits, silence the false positive.
   {

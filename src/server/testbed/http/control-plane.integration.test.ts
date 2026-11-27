@@ -4,6 +4,8 @@
  */
 import { afterEach, describe, expect, test } from 'bun:test';
 
+import packageJson from '../../../../package.json';
+
 import type { TestbedEvent } from '@shared/testbed/events';
 
 import { sampleCore } from '../cores/sample';
@@ -85,7 +87,7 @@ describe('manifest', () => {
       auth: { control: string };
     }>('GET', '/manifest');
     expect(status).toBe(200);
-    expect(body.name).toBe('testbed-base');
+    expect(body.name).toBe(packageJson.name);
     expect(body.instanceId).toBeString();
     expect(body.cores[0]?.id).toBe('sample');
     expect(body.cores[0]?.kind).toBe('passive');

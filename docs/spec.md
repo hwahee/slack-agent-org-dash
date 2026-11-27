@@ -4,9 +4,10 @@ Slack 에이전트(`slack-agent-org`)가 실행 중에 남기는 진단 기록�
 
 ## 변경 이력
 
-| 날짜       | 바뀐 절   | 영향받는 마일스톤 |
-| ---------- | --------- | ----------------- |
-| 2026-11-27 | 최초 작성 | M1–M4             |
+| 날짜       | 바뀐 절                                                                                                                                                                                                                                    | 영향받는 마일스톤 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| 2026-11-27 | 2절 샘플 코어: 스모크 시나리오도 남김(공통 시험이 불러옴, 이 테스트베드에서는 SKIP). 9절·11절 M2: 오류 코드를 실제 공통 런타임에 맞춤(`VALIDATION_ERROR`, `set_config`의 `restart-required` 결과), 고정 데이터 위치 `fixtures/agent-data/` | M1, M2            |
+| 2026-11-27 | 최초 작성                                                                                                                                                                                                                                  | M1–M4             |
 
 ## 1. 목적
 
@@ -172,7 +173,7 @@ Slack 에이전트(`slack-agent-org`)가 실행 중에 남기는 진단 기록�
 | `scan_history` | `{ hours?: 1–168 (기본 24), since?: ISO, until?: ISO }` — `since`가 있으면 `hours`보다 우선 | `{ from, to, records, invalid, byKind: Record<kind, n>, boots: string[], socket: { connections, closes: { t, conn, code, livedMs }[], disconnectRequests, reconnectFailures }, messages: { socket, catchup, rescued: { t, id, delayMs, outcome }[] (최대 50, 늦은 순) }, clockGaps: { count, totalMs, maxMs }, turns: { count, failed } }` | 없음   | –   | 셋 다       |
 
 - 두 액션 모두 파일을 읽기만 하고 이벤트 버스에 아무것도 내지 않습니다. MCP 도구 이름은 `agent_snapshot`, `agent_scan_history`입니다.
-- `scan_history`는 기간 안의 날짜 파일만 엽니다. 기간이 7일을 넘으면 `INVALID_INPUT`입니다.
+- `scan_history`는 기간 안의 날짜 파일만 엽니다. 기간이 7일을 넘거나 `since`가 `until`보다 늦으면 `VALIDATION_ERROR`입니다.
 - `rescued`는 `path: catchup`이고 `outcome`이 `queued` 또는 `overheard`인 메시지입니다(사람이 보낸 말을 귀가 놓친 경우).
 - 공통 도구로 충분한 것: 이력 판정은 `check`로 합니다. 예: 귀가 놓친 메시지가 없었는가 = `check({ kind: 'agent.message.observed', level: 'warn' }, { none: true })`, 반쯤 죽은 소켓이 없었는가 = `check({ kind: 'agent.health.changed', text: '→ deaf' }, { none: true })`.
 
@@ -218,13 +219,13 @@ Slack 에이전트(`slack-agent-org`)가 실행 중에 남기는 진단 기록�
 
 ### M2 — 액션, 제어면, 스모크
 
-- `snapshot`, `scan_history`(9절)와 스모크 시나리오. 스모크는 레포에 넣은 **합성 고정 데이터**(`fixtures/diag/`, 실제 제품 데이터 아님)를 `set_config`의 `dataDir`로 가리켜 씁니다.
+- `snapshot`, `scan_history`(9절)와 스모크 시나리오. 스모크는 레포에 넣은 **합성 고정 데이터**(`fixtures/agent-data/`, 실제 제품 데이터 아님)를 `set_config`의 `dataDir`로 가리켜 쓰고, 끝나면 원래 `dataDir`로 되돌립니다. 고정 데이터는 고정한 계약을 통과해야 합니다(단위 테스트).
 - 수용 기준(`bun run testbed:smoke` 통과, 액션 커버리지 포함)
   1. `testbed_info` → 코어 `agent`가 running, 데이터면 주소 없음.
-  2. `set_config({ core: 'agent', patch: { dataDir: 'fixtures/diag' } })` → `RESTART_REQUIRED` → `stop` → `start` → `agent_snapshot` 결과의 `health`가 `stopped`(고정 데이터라 스냅샷이 오래됨), `files`에 고정 데이터의 파일 이름.
+  2. `set_config({ core: 'agent', patch: { dataDir: 'fixtures/agent-data' } })` → `result: 'restart-required'` → `stop` → `start` → `agent_snapshot` 결과의 `health`가 `stopped`(고정 데이터라 스냅샷이 오래됨), `files`가 `['diag-2026-01-02.jsonl']`.
   3. `agent_scan_history({ since: <고정 데이터 시작>, until: <끝> })` → `messages.rescued`에 고정 데이터의 놓친 DM 1건(지연 ≥ 60000ms), `socket.closes` 1건, `clockGaps.count` ≥ 1.
-  4. `agent_scan_history({ hours: 200 })` → `INVALID_INPUT`.
-  5. `set_config({ core: 'agent', patch: { faults: [{ id: 'x', delayMs: 10 }] } })` → 설정 검증 오류.
+  4. `agent_scan_history({ hours: 200 })`와 8일짜리 `since`·`until` → `VALIDATION_ERROR`.
+  5. `set_config({ core: 'agent', patch: { faults: [{ id: 'x', delayMs: 10 }] } })` → `VALIDATION_ERROR`.
 
 ### M3a — 대시보드 설계
 

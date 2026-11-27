@@ -58,7 +58,12 @@ const brokenEcho = defineSmoke({
 describe('runSmoke', () => {
   test('the shipped scenarios: common check and 4 scenarios PASS, py-echo SKIP (not turned on), coverage PASS', async () => {
     const { base } = await startTestbed();
-    const scenarios = await loadScenarios();
+    // The common runtime's own scenarios; a testbed's (cores/<id>/smoke) come on top.
+    const scenarios = (await loadScenarios()).filter(
+      (scenario) =>
+        scenario.file?.startsWith('src/server/testbed/cores/sample/') === true ||
+        scenario.file?.startsWith('examples/') === true,
+    );
     expect(scenarios.map((scenario) => scenario.file)).toEqual([
       'src/server/testbed/cores/sample/smoke/sample-broadcast.smoke.ts',
       'src/server/testbed/cores/sample/smoke/sample-echo.smoke.ts',
@@ -210,7 +215,8 @@ describe('bun run testbed:smoke', () => {
     const child = cli(['--url', base]);
     expect(await child.exited).toBe(0);
     const stdout = await new Response(child.stdout).text();
-    expect(stdout).toContain('total: 5 pass, 0 fail, 1 skip; coverage PASS');
+    // A testbed's own scenarios SKIP here (this server runs the sample core only).
+    expect(stdout).toMatch(/total: 5 pass, 0 fail, \d+ skip; coverage PASS/);
   }, 60_000);
 
   test('nothing answering at --url is exit 2', async () => {

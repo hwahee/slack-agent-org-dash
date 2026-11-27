@@ -12,12 +12,14 @@ import type {
   AgentRecordPayloadExtras,
 } from '@shared/testbed/cores/agent/events';
 import type { EventLevel } from '@shared/testbed/events';
+import { s, toValidator } from '@shared/validation';
 import { DIAG_VERSION } from 'slack-agent-org/src/diag/events';
 
 import type { CoreContext, CoreDefinition, CoreInstance } from '../../core';
 import { agentConfigValidator, agentDefaultConfig, type AgentConfig } from './config';
 import { describeRecord } from './describe';
 import { judgeHealth } from './health';
+import { scanHistory, scanInput, scanOutput, type ScanOutput } from './scan';
 import { DiagSource } from './source';
 import { Tailer, type TailItem } from './tailer';
 
@@ -112,8 +114,30 @@ export class AgentCore implements CoreInstance {
     return this.health;
   }
 
-  get diagSource(): DiagSource | undefined {
-    return this.source;
+  /** `snapshot` (§9): a fresh look now, not the last poll's. */
+  async snapshot(): Promise<SnapshotOutput> {
+    const source = this.source ?? new DiagSource(this.ctx.config().dataDir);
+    const { pingStaleSec, snapshotStaleSec } = this.ctx.config();
+    const read = await source.status();
+    const now = Date.now();
+    const health = judgeHealth(read, now, { pingStaleSec, snapshotStaleSec });
+    const listing = await source.list();
+    return {
+      health: health.state,
+      reason: health.reason,
+      judgedAt: new Date(now).toISOString(),
+      snapshotAgeMs: health.snapshotAgeMs,
+      pingAgeMs: health.pingAgeMs,
+      frameAgeMs: health.frameAgeMs,
+      files: listing.ok ? listing.files.map((file) => file.name) : [],
+      status: read.ok ? read.value : null,
+    };
+  }
+
+  /** `scan_history` (§9): the period's records summed up, read only. */
+  scan(input: unknown): Promise<ScanOutput> {
+    const source = this.source ?? new DiagSource(this.ctx.config().dataDir);
+    return scanHistory(source, scanInput.parse(input), Date.now());
   }
 
   // ── Polling ──────────────────────────────────────────────────────────────
@@ -231,6 +255,31 @@ export class AgentCore implements CoreInstance {
   }
 }
 
+const snapshotOutput = toValidator(
+  s.object({
+    health: s.enum(['absent', 'stopped', 'disconnected', 'deaf', 'ok']),
+    reason: s.string(),
+    judgedAt: s.string(),
+    snapshotAgeMs: s.nullable(s.number()),
+    pingAgeMs: s.nullable(s.number()),
+    frameAgeMs: s.nullable(s.number()),
+    files: s.array(s.string()),
+    status: s.unknown(),
+  }),
+);
+interface SnapshotOutput {
+  health: AgentHealthState;
+  reason: string;
+  judgedAt: string;
+  snapshotAgeMs: number | null;
+  pingAgeMs: number | null;
+  frameAgeMs: number | null;
+  files: string[];
+  status: unknown;
+}
+
+const noInput = toValidator(s.object({}));
+
 export const agentCore: CoreDefinition<AgentConfig, AgentCore> = {
   id: 'agent',
   kind: 'passive',
@@ -238,5 +287,33 @@ export const agentCore: CoreDefinition<AgentConfig, AgentCore> = {
   configSchema: agentConfigValidator,
   defaultConfig: agentDefaultConfig,
   faults: [],
+  actions: {
+    snapshot: {
+      title: '지금 상태',
+      description:
+        '에이전트의 status.json을 지금 읽어 수신 건강 상태(absent·stopped·disconnected·deaf·ok)와 이유, 스냅샷·마지막 ping·마지막 프레임의 나이(ms), 진단 파일 목록, status.json 원문을 돌려줌. deaf는 연결됐다고 믿는데 ping이 pingStaleSec(기본 30초)보다 오래 멈춘 반쯤 죽은 소켓. 파일을 읽기만 하고 이벤트를 내지 않음. 락 불필요.',
+      input: noInput,
+      output: snapshotOutput,
+      mutating: false,
+      summarize: (output) => {
+        const o = output as SnapshotOutput;
+        return `수신 상태 ${o.health}: ${o.reason}`;
+      },
+      run: (instance) => instance.snapshot(),
+    },
+    scan_history: {
+      title: '지난 기록 훑기',
+      description:
+        '진단 기록을 기간으로 훑어 합계를 돌려줌: kind별 건수, 에이전트 부팅, 소켓 연결·닫힘(시각·code·유지 시간)·재연결 요청·재연결 실패, 소켓으로/따라잡기로 받은 메시지 수, 귀가 놓쳐 따라잡기로 들어온 메시지(rescued, 늦은 순 최대 50건, delayMs), 시계 공백(잠자기) 수·합·최대(ms), 턴 수·실패 수. 기간은 since·until(ISO) 또는 최근 hours(1–168, 기본 24). 7일을 넘으면 VALIDATION_ERROR. 파일을 읽기만 하고 이벤트를 내지 않음. 락 불필요.',
+      input: scanInput,
+      output: scanOutput,
+      mutating: false,
+      summarize: (output) => {
+        const o = output as ScanOutput;
+        return `${o.from} ~ ${o.to}: 기록 ${o.records}건, 놓친 메시지 ${o.messages.rescued.length}건, 소켓 닫힘 ${o.socket.closes.length}건, 시계 공백 ${o.clockGaps.count}회`;
+      },
+      run: (instance, input) => instance.scan(input),
+    },
+  },
   create: (ctx) => new AgentCore(ctx),
 };

@@ -7,9 +7,9 @@
  * the container) the testbed runs on. The release is recorded as
  * `testbed.lease.released` with `actor: 'system'`, `reason: 'forced'`.
  *
- *   bun run testbed:release            # PORT from the env, else 40000
+ *   bun run testbed:release            # PORT from the env, else 40010
  */
-const port = process.env.PORT === undefined || process.env.PORT === '' ? '40000' : process.env.PORT;
+const port = process.env.PORT === undefined || process.env.PORT === '' ? '40010' : process.env.PORT;
 const url = `http://127.0.0.1:${port}/testbed/internal/release`;
 
 try {

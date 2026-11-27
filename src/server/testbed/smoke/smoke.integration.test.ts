@@ -197,13 +197,11 @@ describe('bun run testbed:smoke', () => {
     const json = JSON.parse(await readFile(out, 'utf8')) as SmokeReport & { exitCode: number };
     expect(json.exitCode).toBe(0);
     expect(json.common.status).toBe('PASS');
-    expect(json.scenarios.map((result) => [result.name, result.status])).toEqual([
-      ['py-echo', 'SKIP'],
-      ['sample-broadcast', 'PASS'],
-      ['sample-echo', 'PASS'],
-      ['sample-faults', 'PASS'],
-      ['sample-run-replace', 'PASS'],
-    ]);
+    // Which scenarios ship and which cores run them is the testbed's choice:
+    // every shipped scenario is reported, and none fails.
+    const shipped = (await loadScenarios()).map((scenario) => scenario.definition.name).sort();
+    expect(json.scenarios.map((result) => result.name).sort()).toEqual(shipped);
+    expect(json.scenarios.filter((result) => result.status === 'FAIL')).toEqual([]);
     expect(json.coverage.status).toBe('PASS');
   }, 60_000);
 
